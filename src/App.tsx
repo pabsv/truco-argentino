@@ -41,7 +41,10 @@ function App() {
       {/* Header with safe area for notch */}
       <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
         <div className="w-7" />
-        <h1 className="text-lg font-bold tracking-wide py-2">Truco</h1>
+        <div className="flex items-center gap-2 py-1">
+          <img src="/anchobasto.jpg" alt="Ancho de Basto" className="h-8 w-auto rounded" />
+          <h1 className="text-lg font-bold tracking-wide">Truco</h1>
+        </div>
         <button
           onClick={() => setShowInfo(true)}
           className="w-7 h-7 text-xs font-bold rounded-full bg-green-600 border border-green-500 flex items-center justify-center flex-shrink-0"
