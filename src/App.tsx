@@ -35,7 +35,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-green-800 flex flex-col text-white overflow-hidden">
+    <div className="h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header */}
       <header className="bg-green-900 py-2 px-4 text-center border-b border-green-700 flex-shrink-0">
         <h1 className="text-lg font-bold tracking-wide">Truco</h1>
