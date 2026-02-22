@@ -271,9 +271,10 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             <p className="font-semibold text-yellow-400 mb-1">iPhone (Safari only):</p>
             <ol className="text-sm space-y-1 text-green-100">
               <li>1. Open in <strong>Safari</strong></li>
-              <li>2. Tap <strong>Share</strong> □↑</li>
-              <li>3. Scroll, tap <strong>...</strong> (More)</li>
-              <li>4. Tap <strong>Add to Home Screen</strong> [+]</li>
+              <li>2. Tap <strong>⋯</strong> (3 dots)</li>
+              <li>3. Tap <strong>Share</strong></li>
+              <li>4. Tap <strong>⋯</strong> (More)</li>
+              <li>5. Tap <strong>Add to Home Screen</strong></li>
             </ol>
           </div>
         )}
