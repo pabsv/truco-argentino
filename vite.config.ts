@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'Truco Argentino',
         short_name: 'Truco',
         description: 'Contador de puntos para Truco Argentino',
-        theme_color: '#1e3a5f',
-        background_color: '#0f172a',
+        theme_color: '#166534',
+        background_color: '#166534',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
