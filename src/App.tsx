@@ -85,7 +85,7 @@ function App() {
             onClick={resetGame}
             className="w-full py-2.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold transition-colors"
           >
-            New Game
+            Nueva Partida
           </button>
         </div>
       </main>
@@ -95,7 +95,7 @@ function App() {
         <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
           <div className="bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
             <span>🏆</span>
-            <span>{winner} wins!</span>
+            <span>¡{winner} ganan!</span>
           </div>
         </div>
       )}
