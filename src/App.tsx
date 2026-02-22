@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 
 const WINNING_SCORE = 30
-const HALFWAY_SCORE = 15
 
 function App() {
   const [nosotros, setNosotros] = useState(() => {
