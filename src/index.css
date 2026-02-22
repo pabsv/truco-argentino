@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+input {
+  user-select: text;
+}
+
+body {
+  overscroll-behavior: none;
+}
