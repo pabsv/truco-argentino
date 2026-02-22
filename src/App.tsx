@@ -36,9 +36,9 @@ function App() {
 
   return (
     <div className="h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
-      {/* Header */}
-      <header className="bg-green-900 py-2 px-4 text-center border-b border-green-700 flex-shrink-0">
-        <h1 className="text-lg font-bold tracking-wide">Truco</h1>
+      {/* Header with safe area for notch */}
+      <header className="bg-green-900 px-4 text-center border-b border-green-700 flex-shrink-0" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
+        <h1 className="text-lg font-bold tracking-wide pb-2">Truco</h1>
       </header>
 
       {/* Main content */}
@@ -70,8 +70,8 @@ function App() {
           </div>
         </div>
 
-        {/* Reset button */}
-        <div className="p-3 bg-green-900 border-t border-green-700 flex-shrink-0">
+        {/* Reset button with safe area for home indicator */}
+        <div className="px-3 pt-3 bg-green-900 border-t border-green-700 flex-shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <button
             onClick={resetGame}
             className="w-full py-2.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold transition-colors"
@@ -83,7 +83,7 @@ function App() {
 
       {/* Winner banner */}
       {winner && (
-        <div className="fixed top-12 left-4 right-4 z-50">
+        <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
           <div className="bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
             <span>🏆</span>
             <span>¡{winner} ganan!</span>

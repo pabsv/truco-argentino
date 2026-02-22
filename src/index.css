@@ -6,6 +6,10 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: #166534;
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -13,6 +17,10 @@ html, body, #root {
   padding: 0;
   overflow: hidden;
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: none;
 }
