@@ -39,12 +39,12 @@ function App() {
   return (
     <div className="h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header with safe area for notch */}
-      <header className="bg-green-900 px-4 border-b border-green-700 flex-shrink-0 flex items-end justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
-        <div className="w-8" />
-        <h1 className="text-lg font-bold tracking-wide pb-2">Truco</h1>
+      <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
+        <div className="w-7" />
+        <h1 className="text-lg font-bold tracking-wide py-2">Truco</h1>
         <button
           onClick={() => setShowInfo(true)}
-          className="w-8 h-8 mb-1 text-sm font-bold rounded-full bg-green-700 hover:bg-green-600 active:bg-green-500 flex items-center justify-center"
+          className="w-7 h-7 text-xs font-bold rounded-full bg-green-600 border border-green-500 flex items-center justify-center flex-shrink-0"
         >
           ?
         </button>
@@ -264,15 +264,16 @@ function InfoModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-bold mb-3 text-center">Agregar a Inicio</h2>
+        <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
 
         {(isIOS || (!isIOS && !isAndroid)) && (
           <div className="mb-3">
-            <p className="font-semibold text-yellow-400 mb-1">iPhone (Safari):</p>
+            <p className="font-semibold text-yellow-400 mb-1">iPhone (Safari only):</p>
             <ol className="text-sm space-y-1 text-green-100">
-              <li>1. Abrir en <strong>Safari</strong></li>
-              <li>2. Tocar <strong>Compartir</strong> (⬆️)</li>
-              <li>3. <strong>Agregar a Inicio</strong> (⊕)</li>
+              <li>1. Open in <strong>Safari</strong></li>
+              <li>2. Tap <strong>Share</strong> □↑</li>
+              <li>3. Scroll, tap <strong>...</strong> (More)</li>
+              <li>4. Tap <strong>Add to Home Screen</strong> [+]</li>
             </ol>
           </div>
         )}
@@ -281,8 +282,8 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           <div className="mb-3">
             <p className="font-semibold text-yellow-400 mb-1">Android (Chrome):</p>
             <ol className="text-sm space-y-1 text-green-100">
-              <li>1. Tocar menú <strong>⋮</strong></li>
-              <li>2. <strong>Agregar a Inicio</strong></li>
+              <li>1. Tap menu <strong>⋮</strong></li>
+              <li>2. Tap <strong>Add to Home Screen</strong></li>
             </ol>
           </div>
         )}
@@ -291,7 +292,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="w-full mt-2 py-2 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold"
         >
-          Cerrar
+          Close
         </button>
       </div>
     </div>
