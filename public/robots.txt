@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pabsv.github.io/truco-argentino/sitemap.xml
