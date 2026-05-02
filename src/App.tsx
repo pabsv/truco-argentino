@@ -12,6 +12,13 @@ function App() {
     const saved = localStorage.getItem('truco-ellos')
     return saved ? parseInt(saved, 10) : 0
   })
+  const [otros, setOtros] = useState(() => {
+    const saved = localStorage.getItem('truco-otros')
+    return saved ? parseInt(saved, 10) : 0
+  })
+  const [threePlayerMode, setThreePlayerMode] = useState(() => {
+    return localStorage.getItem('truco-three-player') === 'true'
+  })
   const [showInfo, setShowInfo] = useState(false)
 
   useWakeLock()
@@ -19,15 +26,22 @@ function App() {
   useEffect(() => {
     localStorage.setItem('truco-nosotros', nosotros.toString())
     localStorage.setItem('truco-ellos', ellos.toString())
-  }, [nosotros, ellos])
+    localStorage.setItem('truco-otros', otros.toString())
+    localStorage.setItem('truco-three-player', threePlayerMode.toString())
+  }, [nosotros, ellos, otros, threePlayerMode])
 
-  const winner = nosotros >= WINNING_SCORE ? 'Nosotros' : ellos >= WINNING_SCORE ? 'Ellos' : null
+  const winner =
+    nosotros >= WINNING_SCORE ? 'Nosotros' :
+    ellos >= WINNING_SCORE ? 'Ellos' :
+    (threePlayerMode && otros >= WINNING_SCORE) ? 'Otros' : null
 
-  const updateScore = (team: 'nosotros' | 'ellos', delta: number) => {
+  const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
     if (team === 'nosotros') {
       setNosotros(prev => Math.max(0, Math.min(30, prev + delta)))
-    } else {
+    } else if (team === 'ellos') {
       setEllos(prev => Math.max(0, Math.min(30, prev + delta)))
+    } else {
+      setOtros(prev => Math.max(0, Math.min(30, prev + delta)))
     }
     if (navigator.vibrate) navigator.vibrate(10)
   }
@@ -35,8 +49,10 @@ function App() {
   const resetGame = () => {
     setNosotros(0)
     setEllos(0)
+    setOtros(0)
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
+    localStorage.removeItem('truco-otros')
   }
 
   return (
@@ -69,6 +85,7 @@ function App() {
               score={nosotros}
               onIncrement={() => updateScore('nosotros', 1)}
               onDecrement={() => updateScore('nosotros', -1)}
+              compact={threePlayerMode}
             />
           </div>
 
@@ -81,8 +98,24 @@ function App() {
               score={ellos}
               onIncrement={() => updateScore('ellos', 1)}
               onDecrement={() => updateScore('ellos', -1)}
+              compact={threePlayerMode}
             />
           </div>
+
+          {/* Otros (3-player mode) */}
+          {threePlayerMode && (
+            <div className="flex-1 flex flex-col border-l border-green-700 min-h-0">
+              <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
+                <h2 className="text-base font-semibold">Otros</h2>
+              </div>
+              <ScorePanel
+                score={otros}
+                onIncrement={() => updateScore('otros', 1)}
+                onDecrement={() => updateScore('otros', -1)}
+                compact={threePlayerMode}
+              />
+            </div>
+          )}
         </div>
 
         {/* Reset button with safe area for home indicator */}
@@ -107,7 +140,13 @@ function App() {
       )}
 
       {/* Info modal */}
-      {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
+      {showInfo && (
+        <InfoModal
+          onClose={() => setShowInfo(false)}
+          threePlayerMode={threePlayerMode}
+          onToggleThreePlayer={() => setThreePlayerMode(prev => !prev)}
+        />
+      )}
     </div>
   )
 }
@@ -116,14 +155,18 @@ interface ScorePanelProps {
   score: number
   onIncrement: () => void
   onDecrement: () => void
+  compact?: boolean
 }
 
-function ScorePanel({ score, onIncrement, onDecrement }: ScorePanelProps) {
+function ScorePanel({ score, onIncrement, onDecrement, compact = false }: ScorePanelProps) {
   const handleTap = () => {
     if (score < 30) {
       onIncrement()
     }
   }
+
+  const buttonSize = compact ? 'w-12 h-12 text-2xl' : 'w-14 h-14 text-3xl'
+  const buttonGap = compact ? 'gap-2' : 'gap-3'
 
   return (
     <div className="flex-1 flex flex-col items-center p-2 min-h-0">
@@ -136,18 +179,18 @@ function ScorePanel({ score, onIncrement, onDecrement }: ScorePanelProps) {
       </div>
 
       {/* Increment/Decrement buttons */}
-      <div className="flex gap-3 flex-shrink-0 pt-2">
+      <div className={`flex ${buttonGap} flex-shrink-0 pt-2`}>
         <button
           onClick={onDecrement}
           disabled={score === 0}
-          className="w-14 h-14 text-3xl font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
         >
           −
         </button>
         <button
           onClick={onIncrement}
           disabled={score >= 30}
-          className="w-14 h-14 text-3xl font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
         >
           +
         </button>
@@ -263,13 +306,32 @@ function MatchBox({ points, active }: { points: number; active: boolean }) {
   )
 }
 
-function InfoModal({ onClose }: { onClose: () => void }) {
+interface InfoModalProps {
+  onClose: () => void
+  threePlayerMode: boolean
+  onToggleThreePlayer: () => void
+}
+
+function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalProps) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   const isAndroid = /Android/.test(navigator.userAgent)
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
+        {/* 3-player toggle */}
+        <div className="mb-4 pb-3 border-b border-green-700">
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="font-semibold">3 players (Otros)</span>
+            <input
+              type="checkbox"
+              checked={threePlayerMode}
+              onChange={onToggleThreePlayer}
+              className="w-5 h-5 accent-yellow-500"
+            />
+          </label>
+        </div>
+
         <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
 
         {(isIOS || (!isIOS && !isAndroid)) && (
