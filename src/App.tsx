@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useWakeLock } from './hooks/useWakeLock'
 
 const WINNING_SCORE = 30
 
@@ -12,6 +13,8 @@ function App() {
     return saved ? parseInt(saved, 10) : 0
   })
   const [showInfo, setShowInfo] = useState(false)
+
+  useWakeLock()
 
   useEffect(() => {
     localStorage.setItem('truco-nosotros', nosotros.toString())
