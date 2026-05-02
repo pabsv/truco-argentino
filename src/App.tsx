@@ -19,6 +19,9 @@ function App() {
   const [threePlayerMode, setThreePlayerMode] = useState(() => {
     return localStorage.getItem('truco-three-player') === 'true'
   })
+  const [nosotrosName, setNosotrosName] = useState(() => localStorage.getItem('truco-nosotros-name') || 'Nosotros')
+  const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
+  const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
   const [showInfo, setShowInfo] = useState(false)
 
   useWakeLock()
@@ -30,10 +33,16 @@ function App() {
     localStorage.setItem('truco-three-player', threePlayerMode.toString())
   }, [nosotros, ellos, otros, threePlayerMode])
 
+  useEffect(() => {
+    localStorage.setItem('truco-nosotros-name', nosotrosName)
+    localStorage.setItem('truco-ellos-name', ellosName)
+    localStorage.setItem('truco-otros-name', otrosName)
+  }, [nosotrosName, ellosName, otrosName])
+
   const winner =
-    nosotros >= WINNING_SCORE ? 'Nosotros' :
-    ellos >= WINNING_SCORE ? 'Ellos' :
-    (threePlayerMode && otros >= WINNING_SCORE) ? 'Otros' : null
+    nosotros >= WINNING_SCORE ? nosotrosName :
+    ellos >= WINNING_SCORE ? ellosName :
+    (threePlayerMode && otros >= WINNING_SCORE) ? otrosName : null
 
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
     if (team === 'nosotros') {
@@ -79,7 +88,7 @@ function App() {
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <h2 className="text-base font-semibold">Nosotros</h2>
+              <EditableTeamName name={nosotrosName} defaultName="Nosotros" onChange={setNosotrosName} />
             </div>
             <ScorePanel
               score={nosotros}
@@ -92,7 +101,7 @@ function App() {
           {/* Ellos */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <h2 className="text-base font-semibold">Ellos</h2>
+              <EditableTeamName name={ellosName} defaultName="Ellos" onChange={setEllosName} />
             </div>
             <ScorePanel
               score={ellos}
@@ -106,7 +115,7 @@ function App() {
           {threePlayerMode && (
             <div className="flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-                <h2 className="text-base font-semibold">Otros</h2>
+                <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
               </div>
               <ScorePanel
                 score={otros}
@@ -148,6 +157,57 @@ function App() {
         />
       )}
     </div>
+  )
+}
+
+interface EditableTeamNameProps {
+  name: string
+  defaultName: string
+  onChange: (next: string) => void
+}
+
+function EditableTeamName({ name, defaultName, onChange }: EditableTeamNameProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    onChange(trimmed === '' ? defaultName : trimmed)
+    setEditing(false)
+  }
+
+  const cancel = () => {
+    setDraft(name)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') commit()
+          else if (e.key === 'Escape') cancel()
+        }}
+        onFocus={e => e.target.select()}
+        maxLength={12}
+        inputMode="text"
+        autoCapitalize="words"
+        className="w-full text-base font-semibold text-center bg-transparent border-b border-yellow-500/60 outline-none"
+      />
+    )
+  }
+
+  return (
+    <h2
+      onClick={() => { setDraft(name); setEditing(true) }}
+      className="text-base font-semibold cursor-pointer truncate px-2"
+    >
+      {name}
+    </h2>
   )
 }
 
