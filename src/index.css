@@ -28,3 +28,140 @@ html, body, #root {
 input {
   user-select: text;
 }
+
+/* --- Animations --- */
+
+.app-fade {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.winner-banner {
+  animation: banner-drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.trophy {
+  display: inline-block;
+  animation: trophy-bounce 1.2s ease-in-out infinite;
+}
+
+.modal-backdrop {
+  animation: fade-in 0.2s ease-out both;
+}
+
+.modal-card {
+  animation: modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.panel-slide-in {
+  animation: slide-in-right 0.3s ease-out both;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -5vh;
+  border-radius: 1px;
+  animation: confetti-fall linear infinite;
+}
+
+.confetti-piece:nth-child(odd) {
+  animation-name: confetti-fall-left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .match-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw-match 0.35s ease-out forwards;
+  }
+}
+
+@keyframes draw-match {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes banner-drop {
+  from {
+    transform: translateY(-150%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes trophy-bounce {
+  0%, 100% {
+    transform: rotate(-12deg) scale(1);
+  }
+  50% {
+    transform: rotate(12deg) scale(1.15);
+  }
+}
+
+@keyframes modal-pop {
+  from {
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(30%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(4vw, 115vh, 0) rotate(720deg);
+    opacity: 0.7;
+  }
+}
+
+@keyframes confetti-fall-left {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-4vw, 115vh, 0) rotate(-720deg);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-fade,
+  .winner-banner,
+  .trophy,
+  .modal-backdrop,
+  .modal-card,
+  .panel-slide-in,
+  .confetti-piece {
+    animation: none;
+  }
+}
