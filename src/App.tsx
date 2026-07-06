@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
 import { TeamPicker } from './components/TeamPicker'
 import { StatsModal } from './components/StatsModal'
@@ -58,6 +58,17 @@ function loadSnapshot(): GameSnapshot | null {
     return null
   }
 }
+
+// Friendly trash talk for the losing team, 90s bowling-alley style
+const TAUNTS = [
+  'a lavar los platos 🧽',
+  'paga el asado 🍖',
+  'paga las birras 🍺',
+  'a practicar al solitario 🃏',
+  'qué baile te pegaron 💃',
+  'mejor jugá a la escoba 🧹',
+  'ni con el ancho te salvás 😂',
+]
 
 function App() {
   const [nosotros, setNosotros] = useState(() => {
@@ -188,6 +199,23 @@ function App() {
     if (winner) setSummaryDismissed(false)
   }, [winner])
 
+  // Loser = lowest-scoring team that didn't win (the one who gets roasted)
+  const loser = useMemo(() => {
+    if (!winner) return null
+    const teams = [
+      { name: nosotrosName, score: nosotros },
+      { name: ellosName, score: ellos },
+      ...(threePlayerMode ? [{ name: otrosName, score: otros }] : []),
+    ].filter(t => t.name !== winner)
+    if (teams.length === 0) return null
+    return teams.reduce((a, b) => (b.score < a.score ? b : a)).name
+  }, [winner, nosotros, ellos, otros, nosotrosName, ellosName, otrosName, threePlayerMode])
+
+  // The big celebration can be dismissed (e.g. to correct a mis-tap);
+  // we remember who it was dismissed for so it doesn't reappear mid-correction
+  const [celebrationDismissedFor, setCelebrationDismissedFor] = useState<string | null>(null)
+  const [taunt, setTaunt] = useState(TAUNTS[0])
+
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
     // Log the change only if it actually moves the score (clamped at 0 and 30),
     // storing the resulting board so the summary charts reflect exactly what happened
@@ -210,6 +238,12 @@ function App() {
       setOtros(prev => Math.max(0, Math.min(30, prev + delta)))
     }
 
+    const current = team === 'nosotros' ? nosotros : team === 'ellos' ? ellos : otros
+    if (delta > 0 && current < WINNING_SCORE && current + delta >= WINNING_SCORE) {
+      setTaunt(TAUNTS[Math.floor(Math.random() * TAUNTS.length)])
+      if (navigator.vibrate) navigator.vibrate([100, 60, 100, 60, 250])
+    }
+
     const s = streakRef.current
     if (delta > 0) {
       if (s.team === team) {
@@ -222,10 +256,11 @@ function App() {
       }
       if (s.count >= 3) setStreak({ team, count: s.count, id: Date.now() })
     } else {
-      // A correction breaks the streak
+      // A correction breaks the streak and re-arms the celebration
       s.team = null
       s.count = 0
       setStreak(prev => (prev?.team === team ? null : prev))
+      setCelebrationDismissedFor(null)
     }
 
     if (navigator.vibrate) navigator.vibrate(10)
@@ -253,6 +288,7 @@ function App() {
     setSummaryDismissed(false)
     streakRef.current = { team: null, count: 0 }
     setStreak(null)
+    setCelebrationDismissedFor(null)
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
     localStorage.removeItem('truco-otros')
@@ -403,32 +439,53 @@ function App() {
         </div>
       </main>
 
-      {/* Winner celebration */}
-      {winner && <Confetti />}
-
-      {/* End-of-game summary with momentum and highlights */}
-      {winner && !summaryDismissed && (
-        <GameSummary
-          teams={teams}
-          events={events}
-          winnerName={winner}
-          onNewGame={resetGame}
-          onClose={() => setSummaryDismissed(true)}
+      {/* Winner flow: bowling celebration first, then summary, then compact banner */}
+      {winner && celebrationDismissedFor !== winner && (
+        <WinCelebration
+          winner={winner}
+          loser={loser}
+          taunt={taunt}
+          onReset={resetGame}
+          onShowSummary={() => {
+            setCelebrationDismissedFor(winner)
+            setSummaryDismissed(false)
+          }}
+          onDismiss={() => {
+            setCelebrationDismissedFor(winner)
+            setSummaryDismissed(true)
+          }}
         />
       )}
 
+      {/* End-of-game summary with momentum and highlights */}
+      {winner && celebrationDismissedFor === winner && !summaryDismissed && (
+        <>
+          <Confetti />
+          <GameSummary
+            teams={teams}
+            events={events}
+            winnerName={winner}
+            onNewGame={resetGame}
+            onClose={() => setSummaryDismissed(true)}
+          />
+        </>
+      )}
+
       {/* Compact banner while correcting scores — tap to reopen the summary */}
-      {winner && summaryDismissed && (
-        <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-          <button
-            onClick={() => setSummaryDismissed(false)}
-            className="winner-banner w-full bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2"
-          >
-            <span className="trophy">🏆</span>
-            <span>¡{winner} {winnerTeam && winnerTeam.players.length === 1 ? 'gana' : 'ganan'}!</span>
-            <span className="text-xs font-semibold opacity-70">Ver resumen</span>
-          </button>
-        </div>
+      {winner && celebrationDismissedFor === winner && summaryDismissed && (
+        <>
+          <Confetti />
+          <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
+            <button
+              onClick={() => setSummaryDismissed(false)}
+              className="winner-banner w-full bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2"
+            >
+              <span className="trophy">🏆</span>
+              <span>¡{winner} {winnerTeam && winnerTeam.players.length === 1 ? 'gana' : 'ganan'}!</span>
+              <span className="text-xs font-semibold opacity-70">Ver resumen</span>
+            </button>
+          </div>
+        </>
       )}
 
       {/* Team picker (presets + custom name) */}
@@ -621,9 +678,9 @@ function MatchBox({ points, active }: { points: number; active: boolean }) {
 
 const CONFETTI_COLORS = ['#fbbf24', '#f59e0b', '#fde68a', '#4ade80', '#ffffff']
 
-function Confetti() {
+function Confetti({ zClass = 'z-40' }: { zClass?: string }) {
   return (
-    <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden" aria-hidden="true">
+    <div className={`pointer-events-none fixed inset-0 ${zClass} overflow-hidden`} aria-hidden="true">
       {Array.from({ length: 40 }, (_, i) => {
         const left = (i * 37) % 100
         const delay = ((i * 53) % 25) / 10
@@ -644,6 +701,89 @@ function Confetti() {
           />
         )
       })}
+    </div>
+  )
+}
+
+function Pin({ face, className = '' }: { face?: string; className?: string }) {
+  return (
+    <div className={`pin-body ${className}`}>
+      {face && <span className="pin-face">{face}</span>}
+    </div>
+  )
+}
+
+interface WinCelebrationProps {
+  winner: string
+  loser: string | null
+  taunt: string
+  onReset: () => void
+  onShowSummary: () => void
+  onDismiss: () => void
+}
+
+function WinCelebration({ winner, loser, taunt, onReset, onShowSummary, onDismiss }: WinCelebrationProps) {
+  return (
+    <div className="crt fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center gap-1 overflow-hidden px-4">
+      <Confetti zClass="z-[60]" />
+
+      <div className="retro-blink text-yellow-400 text-sm font-bold tracking-[0.3em] whitespace-nowrap">
+        ★ ★ ★ ¡GANADOR! ★ ★ ★
+      </div>
+      <div className="winner-slam text-4xl font-black text-white text-center truncate max-w-full">
+        {winner}
+      </div>
+
+      {/* Bowling lane: ball rolls in and scatters the pins */}
+      <div className="relative w-full max-w-sm h-32 flex-shrink-0">
+        <div className="absolute bottom-2.5 left-0 right-0 h-1 bg-yellow-900/60 rounded" />
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className={`lane-pin pin-fly-${i}`} style={{ left: `${62 + i * 8}%`, bottom: '12px' }}>
+            <Pin />
+          </div>
+        ))}
+        <div className="bowling-ball" />
+        <div className="strike-text">¡STRIKE!</div>
+      </div>
+
+      {/* Winner pin dances, loser pin cries */}
+      <div className="fade-in-late flex flex-col items-center gap-1">
+        <div className="flex items-end gap-10">
+          <div className="flex flex-col items-center gap-1">
+            <div className="pin-dance"><Pin face="😎" /></div>
+            <span className="text-yellow-400 text-xs font-bold max-w-24 truncate">{winner}</span>
+          </div>
+          {loser && (
+            <div className="flex flex-col items-center gap-1">
+              <div className="pin-cry"><Pin face="😭" /></div>
+              <span className="text-green-200 text-xs font-bold max-w-24 truncate">{loser}</span>
+            </div>
+          )}
+        </div>
+        {loser && (
+          <p className="text-yellow-300 font-bold text-lg text-center">
+            ¡{loser}, {taunt}!
+          </p>
+        )}
+      </div>
+
+      <div className="fade-in-late w-full max-w-xs flex flex-col items-center gap-2 mt-2">
+        <button
+          onClick={onReset}
+          className="w-full py-2.5 bg-yellow-500 text-green-950 rounded-lg font-bold transition active:scale-[0.98]"
+        >
+          Nueva Partida
+        </button>
+        <button
+          onClick={onShowSummary}
+          className="w-full py-2 bg-green-800 border border-green-600 rounded-lg font-semibold transition active:scale-[0.98]"
+        >
+          Ver resumen 📈
+        </button>
+        <button onClick={onDismiss} className="text-green-300 underline text-sm py-1">
+          corregir puntaje
+        </button>
+      </div>
     </div>
   )
 }
