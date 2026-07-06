@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
 import { TeamPicker } from './components/TeamPicker'
 import { StatsModal } from './components/StatsModal'
+import { GameSummary, type ScoreEvent } from './components/GameSummary'
 import {
   addPlayer,
   fetchPlayers,
@@ -24,6 +25,15 @@ function loadTeamPlayers(key: TeamKey): string[] {
   try {
     const raw = localStorage.getItem(`truco-${key}-players`)
     return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+function loadEvents(): ScoreEvent[] {
+  try {
+    const raw = localStorage.getItem('truco-game-events')
+    return raw ? (JSON.parse(raw) as ScoreEvent[]) : []
   } catch {
     return []
   }
@@ -57,6 +67,10 @@ function App() {
   const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   const [showStats, setShowStats] = useState(false)
+
+  // Point-by-point log of the current game, used for the end-of-game summary
+  const [events, setEvents] = useState<ScoreEvent[]>(loadEvents)
+  const [summaryDismissed, setSummaryDismissed] = useState(false)
 
   // Streak: consecutive quick taps on the same team trigger a celebration
   const streakRef = useRef<{ team: string | null; count: number; last: number }>({ team: null, count: 0, last: 0 })
@@ -100,6 +114,11 @@ function App() {
     else localStorage.removeItem('truco-game-id')
   }, [currentGameId])
 
+  useEffect(() => {
+    if (events.length > 0) localStorage.setItem('truco-game-events', JSON.stringify(events))
+    else localStorage.removeItem('truco-game-events')
+  }, [events])
+
   const teams: { key: TeamKey; name: string; players: string[]; score: number }[] = [
     { key: 'nosotros', name: nosotrosName, players: nosotrosPlayers, score: nosotros },
     { key: 'ellos', name: ellosName, players: ellosPlayers, score: ellos },
@@ -133,7 +152,18 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner, nosotros, ellos, otros])
 
+  // Open the end-of-game summary whenever a winner is decided
+  useEffect(() => {
+    if (winner) setSummaryDismissed(false)
+  }, [winner])
+
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
+    // Log the change only if it actually moves the score (clamped at 0 and 30)
+    const current = team === 'nosotros' ? nosotros : team === 'ellos' ? ellos : otros
+    if (Math.max(0, Math.min(30, current + delta)) !== current) {
+      setEvents(prev => [...prev, { team, delta: delta > 0 ? 1 : -1, at: Date.now() }])
+    }
+
     if (team === 'nosotros') {
       setNosotros(prev => Math.max(0, Math.min(30, prev + delta)))
     } else if (team === 'ellos') {
@@ -173,6 +203,8 @@ function App() {
     setNosotros(0)
     setEllos(0)
     setOtros(0)
+    setEvents([])
+    setSummaryDismissed(false)
     streakRef.current = { team: null, count: 0, last: 0 }
     setStreak(null)
     localStorage.removeItem('truco-nosotros')
@@ -291,16 +323,31 @@ function App() {
       </main>
 
       {/* Winner celebration */}
-      {winner && (
-        <>
-          <Confetti />
-          <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-            <div className="winner-banner bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
-              <span className="trophy">🏆</span>
-              <span>¡{winner} {winnerTeam && winnerTeam.players.length === 1 ? 'gana' : 'ganan'}!</span>
-            </div>
-          </div>
-        </>
+      {winner && <Confetti />}
+
+      {/* End-of-game summary with momentum and highlights */}
+      {winner && !summaryDismissed && (
+        <GameSummary
+          teams={teams}
+          events={events}
+          winnerName={winner}
+          onNewGame={resetGame}
+          onClose={() => setSummaryDismissed(true)}
+        />
+      )}
+
+      {/* Compact banner while correcting scores — tap to reopen the summary */}
+      {winner && summaryDismissed && (
+        <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
+          <button
+            onClick={() => setSummaryDismissed(false)}
+            className="winner-banner w-full bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2"
+          >
+            <span className="trophy">🏆</span>
+            <span>¡{winner} {winnerTeam && winnerTeam.players.length === 1 ? 'gana' : 'ganan'}!</span>
+            <span className="text-xs font-semibold opacity-70">Ver resumen</span>
+          </button>
+        </div>
       )}
 
       {/* Team picker (presets + custom name) */}
