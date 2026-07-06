@@ -158,10 +158,15 @@ function App() {
   }, [winner])
 
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
-    // Log the change only if it actually moves the score (clamped at 0 and 30)
-    const current = team === 'nosotros' ? nosotros : team === 'ellos' ? ellos : otros
-    if (Math.max(0, Math.min(30, current + delta)) !== current) {
-      setEvents(prev => [...prev, { team, delta: delta > 0 ? 1 : -1, at: Date.now() }])
+    // Log the change only if it actually moves the score (clamped at 0 and 30),
+    // storing the resulting board so the summary charts reflect exactly what happened
+    const scores = { nosotros, ellos, otros }
+    const next = Math.max(0, Math.min(30, scores[team] + delta))
+    if (next !== scores[team]) {
+      setEvents(prev => [
+        ...prev,
+        { team, delta: delta > 0 ? 1 : -1, at: Date.now(), scores: { ...scores, [team]: next } },
+      ])
     }
 
     if (team === 'nosotros') {

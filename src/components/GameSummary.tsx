@@ -2,10 +2,13 @@ import { useMemo } from 'react'
 
 // One entry per effective score change during the game; the full log lets the
 // summary reconstruct how the match unfolded (momentum, streaks, lead changes).
+// `scores` is the board right after the change — the ground truth for charts,
+// even when the log doesn't cover the whole game (e.g. app updated mid-match).
 export interface ScoreEvent {
   team: string
   delta: 1 | -1
   at: number
+  scores?: Record<string, number>
 }
 
 export interface SummaryTeam {
@@ -32,9 +35,20 @@ function formatDuration(ms: number): string {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
-// Replays the event log from 0-0, clamping like the scoreboard does.
-// Returns one score tuple per step, starting with the all-zeros state.
+// Returns one score tuple per step, starting from the state before the first
+// logged event. Prefers the per-event score snapshots; for older logs without
+// them, replays the deltas from 0-0 and shifts the result so it ends exactly
+// at the real final scores (covers games only partially logged).
 function buildTimeline(teams: SummaryTeam[], events: ScoreEvent[]): number[][] {
+  if (events.length > 0 && events.every(e => e.scores)) {
+    const first = events[0]
+    const initial = teams.map(t => {
+      const s = first.scores![t.key] ?? 0
+      return t.key === first.team ? Math.max(0, s - first.delta) : s
+    })
+    return [initial, ...events.map(e => teams.map(t => e.scores![t.key] ?? 0))]
+  }
+
   const indexByKey = new Map(teams.map((t, i) => [t.key, i]))
   const current = teams.map(() => 0)
   const timeline: number[][] = [[...current]]
@@ -44,7 +58,8 @@ function buildTimeline(teams: SummaryTeam[], events: ScoreEvent[]): number[][] {
     current[i] = Math.max(0, Math.min(30, current[i] + e.delta))
     timeline.push([...current])
   }
-  return timeline
+  const offsets = teams.map((t, i) => t.score - current[i])
+  return timeline.map(step => step.map((s, i) => Math.max(0, s + offsets[i])))
 }
 
 interface SummaryStats {
@@ -93,43 +108,7 @@ function computeStats(events: ScoreEvent[], timeline: number[][], teams: Summary
   return { duration, leadChanges, maxLead, bestRun }
 }
 
-// Two-team momentum: score difference over the course of the game, filled
-// with each team's color depending on who was ahead.
-function MomentumChart({ teams, timeline }: { teams: SummaryTeam[]; timeline: number[][] }) {
-  const diffs = timeline.map(s => s[0] - s[1])
-  const maxAbs = Math.max(3, ...diffs.map(Math.abs))
-  const W = 280
-  const H = 110
-  const midY = H / 2
-  const px = (i: number) => (i / (diffs.length - 1)) * W
-  const py = (d: number) => midY - (d / maxAbs) * (midY - 6)
-
-  const areaPath = (clamp: (d: number) => number) =>
-    `M 0 ${midY} ` + diffs.map((d, i) => `L ${px(i).toFixed(1)} ${py(clamp(d)).toFixed(1)}`).join(' ') + ` L ${W} ${midY} Z`
-
-  const linePoints = diffs.map((d, i) => `${px(i).toFixed(1)},${py(d).toFixed(1)}`).join(' ')
-
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Momentum de la partida">
-        <path d={areaPath(d => Math.max(0, d))} fill={TEAM_COLORS[0]} opacity={0.35} />
-        <path d={areaPath(d => Math.min(0, d))} fill={TEAM_COLORS[1]} opacity={0.35} />
-        <line x1={0} y1={midY} x2={W} y2={midY} stroke="#ffffff50" strokeWidth={1} strokeDasharray="3 3" />
-        <polyline points={linePoints} fill="none" stroke="#ffffff" strokeWidth={1.5} strokeLinejoin="round" opacity={0.85} />
-      </svg>
-      <div className="flex justify-between text-[0.65rem] text-green-200 mt-1">
-        {teams.slice(0, 2).map((t, i) => (
-          <span key={t.key} className="flex items-center gap-1 min-w-0">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLORS[i] }} />
-            <span className="truncate">{t.name} {i === 0 ? 'arriba' : 'abajo'}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Three-team fallback: each team's score over the course of the game.
+// Each team's score over the course of the game — one line per team.
 function ProgressChart({ teams, timeline }: { teams: SummaryTeam[]; timeline: number[][] }) {
   const W = 280
   const H = 110
@@ -176,19 +155,15 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
   const timeline = useMemo(() => buildTimeline(teams, events), [teams, events])
   const stats = useMemo(() => computeStats(events, timeline, teams), [events, timeline, teams])
 
-  // If the log doesn't reproduce the final scores (e.g. a game started before
-  // this feature existed), the reconstructed momentum would be wrong — skip it.
-  const finalStep = timeline[timeline.length - 1]
-  const consistent = teams.every((t, i) => finalStep[i] === t.score)
-  const showChart = consistent && timeline.length >= 3
+  const showChart = timeline.length >= 3
 
   const statCards: { label: string; value: string }[] = []
   if (stats.duration) statCards.push({ label: '⏱ Duración', value: stats.duration })
-  if (consistent && stats.bestRun) {
+  if (stats.bestRun) {
     statCards.push({ label: '🔥 Mejor racha', value: `${teams[stats.bestRun.team].name} +${stats.bestRun.length}` })
   }
-  if (consistent) statCards.push({ label: '🔄 Cambios de líder', value: `${stats.leadChanges}` })
-  if (consistent && stats.maxLead) {
+  if (showChart) statCards.push({ label: '🔄 Cambios de líder', value: `${stats.leadChanges}` })
+  if (stats.maxLead) {
     statCards.push({ label: '📈 Máx. ventaja', value: `${teams[stats.maxLead.team].name} +${stats.maxLead.margin}` })
   }
 
@@ -216,13 +191,11 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
           ))}
         </div>
 
-        {/* Momentum */}
+        {/* Score progression: each team's climb to 30 */}
         {showChart && (
           <div className="mb-4">
-            <h3 className="text-xs font-semibold text-green-300 mb-1.5">Momentum</h3>
-            {teams.length === 2
-              ? <MomentumChart teams={teams} timeline={timeline} />
-              : <ProgressChart teams={teams} timeline={timeline} />}
+            <h3 className="text-xs font-semibold text-green-300 mb-1.5">Progresión</h3>
+            <ProgressChart teams={teams} timeline={timeline} />
           </div>
         )}
 
