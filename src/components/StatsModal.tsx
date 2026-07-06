@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchAllGames, loadGames, type GameMode, type StoredGame } from '../lib/store'
+import { fetchAllGames, loadGroupGames, type GameMode, type StoredGame } from '../lib/store'
 
 const MODE_LABELS: Record<GameMode, string> = {
   '1v1': '1 vs 1',
@@ -21,7 +21,7 @@ interface PlayerStats {
 }
 
 export function StatsModal({ onClose }: { onClose: () => void }) {
-  const [games, setGames] = useState<StoredGame[]>(loadGames)
+  const [games, setGames] = useState<StoredGame[]>(loadGroupGames)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | GameMode>('all')
 

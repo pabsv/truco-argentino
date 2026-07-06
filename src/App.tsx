@@ -5,10 +5,12 @@ import { StatsModal } from './components/StatsModal'
 import {
   addPlayer,
   fetchPlayers,
+  getGroupId,
   loadPlayers,
   newId,
   recordGame,
   removePlayer,
+  setGroupId,
   syncGames,
   type GameMode,
   type GameTeam,
@@ -50,6 +52,7 @@ function App() {
   const [ellosPlayers, setEllosPlayers] = useState<string[]>(() => loadTeamPlayers('ellos'))
   const [otrosPlayers, setOtrosPlayers] = useState<string[]>(() => loadTeamPlayers('otros'))
   const [presets, setPresets] = useState<string[]>(loadPlayers)
+  const [groupId, setGroupIdState] = useState<string>(getGroupId)
   const [currentGameId, setCurrentGameId] = useState<string | null>(() => localStorage.getItem('truco-game-id'))
   const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
@@ -163,6 +166,14 @@ function App() {
     nosotros: { defaultName: 'Nosotros', name: nosotrosName, players: nosotrosPlayers },
     ellos: { defaultName: 'Ellos', name: ellosName, players: ellosPlayers },
     otros: { defaultName: 'Otros', name: otrosName, players: otrosPlayers },
+  }
+
+  const joinGroup = (code: string) => {
+    const normalized = code.trim().toUpperCase()
+    if (normalized === '' || normalized === groupId) return
+    setGroupIdState(setGroupId(normalized))
+    setPresets([])
+    fetchPlayers().then(setPresets)
   }
 
   return (
@@ -281,6 +292,8 @@ function App() {
           onClose={() => setShowInfo(false)}
           threePlayerMode={threePlayerMode}
           onToggleThreePlayer={() => setThreePlayerMode(prev => !prev)}
+          groupId={groupId}
+          onJoinGroup={joinGroup}
         />
       )}
     </div>
@@ -453,15 +466,31 @@ interface InfoModalProps {
   onClose: () => void
   threePlayerMode: boolean
   onToggleThreePlayer: () => void
+  groupId: string
+  onJoinGroup: (code: string) => void
 }
 
-function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalProps) {
+function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer, groupId, onJoinGroup }: InfoModalProps) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   const isAndroid = /Android/.test(navigator.userAgent)
+  const [joinCode, setJoinCode] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const copyCode = () => {
+    navigator.clipboard?.writeText(groupId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
+
+  const submitJoin = () => {
+    onJoinGroup(joinCode)
+    setJoinCode('')
+  }
 
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
+      <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600 max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* 3-player toggle */}
         <div className="mb-4 pb-3 border-b border-green-700">
           <label className="flex items-center justify-between cursor-pointer">
@@ -473,6 +502,38 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalP
               className="w-5 h-5 accent-yellow-500"
             />
           </label>
+        </div>
+
+        {/* Group code: shared stats across devices, isolation between friend groups */}
+        <div className="mb-4 pb-3 border-b border-green-700">
+          <p className="font-semibold mb-1">Grupo</p>
+          <p className="text-xs text-green-200 mb-2">
+            Tus partidas y jugadores se guardan en este grupo. Compartí el código para ver las mismas estadísticas en otro teléfono.
+          </p>
+          <button
+            onClick={copyCode}
+            className="w-full py-1.5 mb-2 bg-green-800 border border-green-600 rounded-lg font-mono text-sm tracking-widest active:bg-green-700"
+          >
+            {copied ? '¡Copiado!' : groupId}
+          </button>
+          <div className="flex gap-2">
+            <input
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => { if (e.key === 'Enter') submitJoin() }}
+              placeholder="Código de otro grupo"
+              maxLength={12}
+              autoCapitalize="characters"
+              className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-green-800 border border-green-600 rounded-lg outline-none focus:border-yellow-500 font-mono uppercase"
+            />
+            <button
+              onClick={submitJoin}
+              disabled={joinCode.trim() === ''}
+              className="px-3 py-1.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg text-sm font-semibold flex-shrink-0 disabled:opacity-30"
+            >
+              Unirse
+            </button>
+          </div>
         </div>
 
         <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
