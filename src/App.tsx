@@ -1,7 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
+import { TeamPicker } from './components/TeamPicker'
+import { StatsModal } from './components/StatsModal'
+import {
+  addPlayer,
+  fetchPlayers,
+  getGroupId,
+  loadPlayers,
+  newId,
+  recordGame,
+  removePlayer,
+  setGroupId,
+  syncGames,
+  type GameMode,
+  type GameTeam,
+} from './lib/store'
 
 const WINNING_SCORE = 30
+
+type TeamKey = 'nosotros' | 'ellos' | 'otros'
+
+function loadTeamPlayers(key: TeamKey): string[] {
+  try {
+    const raw = localStorage.getItem(`truco-${key}-players`)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
 
 function App() {
   const [nosotros, setNosotros] = useState(() => {
@@ -22,7 +48,15 @@ function App() {
   const [nosotrosName, setNosotrosName] = useState(() => localStorage.getItem('truco-nosotros-name') || 'Nosotros')
   const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
   const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
+  const [nosotrosPlayers, setNosotrosPlayers] = useState<string[]>(() => loadTeamPlayers('nosotros'))
+  const [ellosPlayers, setEllosPlayers] = useState<string[]>(() => loadTeamPlayers('ellos'))
+  const [otrosPlayers, setOtrosPlayers] = useState<string[]>(() => loadTeamPlayers('otros'))
+  const [presets, setPresets] = useState<string[]>(loadPlayers)
+  const [groupId, setGroupIdState] = useState<string>(getGroupId)
+  const [currentGameId, setCurrentGameId] = useState<string | null>(() => localStorage.getItem('truco-game-id'))
+  const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [showStats, setShowStats] = useState(false)
 
   // Streak: consecutive quick taps on the same team trigger a celebration
   const streakRef = useRef<{ team: string | null; count: number; last: number }>({ team: null, count: 0, last: 0 })
@@ -35,6 +69,12 @@ function App() {
   }, [streak])
 
   useWakeLock()
+
+  // Push any games queued while offline and refresh player presets from Supabase
+  useEffect(() => {
+    void syncGames()
+    fetchPlayers().then(setPresets)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('truco-nosotros', nosotros.toString())
@@ -49,10 +89,49 @@ function App() {
     localStorage.setItem('truco-otros-name', otrosName)
   }, [nosotrosName, ellosName, otrosName])
 
-  const winner =
-    nosotros >= WINNING_SCORE ? nosotrosName :
-    ellos >= WINNING_SCORE ? ellosName :
-    (threePlayerMode && otros >= WINNING_SCORE) ? otrosName : null
+  useEffect(() => {
+    localStorage.setItem('truco-nosotros-players', JSON.stringify(nosotrosPlayers))
+    localStorage.setItem('truco-ellos-players', JSON.stringify(ellosPlayers))
+    localStorage.setItem('truco-otros-players', JSON.stringify(otrosPlayers))
+  }, [nosotrosPlayers, ellosPlayers, otrosPlayers])
+
+  useEffect(() => {
+    if (currentGameId) localStorage.setItem('truco-game-id', currentGameId)
+    else localStorage.removeItem('truco-game-id')
+  }, [currentGameId])
+
+  const teams: { key: TeamKey; name: string; players: string[]; score: number }[] = [
+    { key: 'nosotros', name: nosotrosName, players: nosotrosPlayers, score: nosotros },
+    { key: 'ellos', name: ellosName, players: ellosPlayers, score: ellos },
+    ...(threePlayerMode ? [{ key: 'otros' as TeamKey, name: otrosName, players: otrosPlayers, score: otros }] : []),
+  ]
+
+  const winnerTeam = teams.find(t => t.score >= WINNING_SCORE) ?? null
+  const winner = winnerTeam?.name ?? null
+
+  const saveCurrentGame = (completed: boolean) => {
+    const id = currentGameId ?? newId()
+    if (!currentGameId) setCurrentGameId(id)
+    const gameTeams: GameTeam[] = teams.map(({ name, players, score }) => ({ name, players, score }))
+    const mode: GameMode = threePlayerMode
+      ? 'free-for-all'
+      : gameTeams.every(t => t.players.length === 1) ? '1v1' : '2v2'
+    recordGame({
+      id,
+      playedAt: new Date().toISOString(),
+      mode,
+      teams: gameTeams,
+      winner: completed ? winner : null,
+      completed,
+    })
+  }
+
+  // Record the game as soon as someone reaches 30, and keep the record
+  // up to date if scores get corrected while the winner banner is showing
+  useEffect(() => {
+    if (winner) saveCurrentGame(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner, nosotros, ellos, otros])
 
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
     if (team === 'nosotros') {
@@ -85,6 +164,12 @@ function App() {
   }
 
   const resetGame = () => {
+    // A game abandoned mid-play still gets saved (as unfinished)
+    const hasPoints = teams.some(t => t.score > 0)
+    if (!winner && hasPoints) {
+      saveCurrentGame(false)
+    }
+    setCurrentGameId(null)
     setNosotros(0)
     setEllos(0)
     setOtros(0)
@@ -95,11 +180,44 @@ function App() {
     localStorage.removeItem('truco-otros')
   }
 
+  const applyTeam = (team: TeamKey, name: string, players: string[]) => {
+    if (team === 'nosotros') {
+      setNosotrosName(name)
+      setNosotrosPlayers(players)
+    } else if (team === 'ellos') {
+      setEllosName(name)
+      setEllosPlayers(players)
+    } else {
+      setOtrosName(name)
+      setOtrosPlayers(players)
+    }
+  }
+
+  const pickerDefaults: Record<TeamKey, { defaultName: string; name: string; players: string[] }> = {
+    nosotros: { defaultName: 'Nosotros', name: nosotrosName, players: nosotrosPlayers },
+    ellos: { defaultName: 'Ellos', name: ellosName, players: ellosPlayers },
+    otros: { defaultName: 'Otros', name: otrosName, players: otrosPlayers },
+  }
+
+  const joinGroup = (code: string) => {
+    const normalized = code.trim().toUpperCase()
+    if (normalized === '' || normalized === groupId) return
+    setGroupIdState(setGroupId(normalized))
+    setPresets([])
+    fetchPlayers().then(setPresets)
+  }
+
   return (
     <div className="app-fade h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header with safe area for notch */}
       <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
-        <div className="w-7" />
+        <button
+          onClick={() => setShowStats(true)}
+          aria-label="Estadísticas"
+          className="w-7 h-7 text-sm rounded-full bg-green-600 border border-green-500 flex items-center justify-center flex-shrink-0"
+        >
+          📊
+        </button>
         <div className="flex items-center gap-2 py-1">
           <img src="/anchobasto.jpg" alt="Ancho de Basto" className="h-8 w-auto rounded" />
           <h1 className="text-lg font-bold tracking-wide">Truco</h1>
@@ -119,7 +237,7 @@ function App() {
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={nosotrosName} defaultName="Nosotros" onChange={setNosotrosName} />
+              <TeamNameButton name={nosotrosName} onClick={() => setPickerTeam('nosotros')} />
             </div>
             <ScorePanel
               score={nosotros}
@@ -133,7 +251,7 @@ function App() {
           {/* Ellos */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={ellosName} defaultName="Ellos" onChange={setEllosName} />
+              <TeamNameButton name={ellosName} onClick={() => setPickerTeam('ellos')} />
             </div>
             <ScorePanel
               score={ellos}
@@ -148,7 +266,7 @@ function App() {
           {threePlayerMode && (
             <div className="panel-slide-in flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-                <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
+                <TeamNameButton name={otrosName} onClick={() => setPickerTeam('otros')} />
               </div>
               <ScorePanel
                 score={otros}
@@ -179,11 +297,28 @@ function App() {
           <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
             <div className="winner-banner bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
               <span className="trophy">🏆</span>
-              <span>¡{winner} ganan!</span>
+              <span>¡{winner} {winnerTeam && winnerTeam.players.length === 1 ? 'gana' : 'ganan'}!</span>
             </div>
           </div>
         </>
       )}
+
+      {/* Team picker (presets + custom name) */}
+      {pickerTeam && (
+        <TeamPicker
+          defaultName={pickerDefaults[pickerTeam].defaultName}
+          currentName={pickerDefaults[pickerTeam].name}
+          currentPlayers={pickerDefaults[pickerTeam].players}
+          presets={presets}
+          onAddPreset={name => setPresets(addPlayer(name))}
+          onRemovePreset={name => setPresets(removePlayer(name))}
+          onApply={(name, players) => applyTeam(pickerTeam, name, players)}
+          onClose={() => setPickerTeam(null)}
+        />
+      )}
+
+      {/* Stats modal */}
+      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
 
       {/* Info modal */}
       {showInfo && (
@@ -191,56 +326,18 @@ function App() {
           onClose={() => setShowInfo(false)}
           threePlayerMode={threePlayerMode}
           onToggleThreePlayer={() => setThreePlayerMode(prev => !prev)}
+          groupId={groupId}
+          onJoinGroup={joinGroup}
         />
       )}
     </div>
   )
 }
 
-interface EditableTeamNameProps {
-  name: string
-  defaultName: string
-  onChange: (next: string) => void
-}
-
-function EditableTeamName({ name, defaultName, onChange }: EditableTeamNameProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(name)
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    onChange(trimmed === '' ? defaultName : trimmed)
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(name)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => {
-          if (e.key === 'Enter') commit()
-          else if (e.key === 'Escape') cancel()
-        }}
-        onFocus={e => e.target.select()}
-        maxLength={12}
-        inputMode="text"
-        autoCapitalize="words"
-        className="w-full text-base font-semibold text-center bg-transparent border-b border-yellow-500/60 outline-none"
-      />
-    )
-  }
-
+function TeamNameButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
     <h2
-      onClick={() => { setDraft(name); setEditing(true) }}
+      onClick={onClick}
       className="text-base font-semibold cursor-pointer truncate px-2"
     >
       {name}
@@ -419,15 +516,31 @@ interface InfoModalProps {
   onClose: () => void
   threePlayerMode: boolean
   onToggleThreePlayer: () => void
+  groupId: string
+  onJoinGroup: (code: string) => void
 }
 
-function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalProps) {
+function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer, groupId, onJoinGroup }: InfoModalProps) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   const isAndroid = /Android/.test(navigator.userAgent)
+  const [joinCode, setJoinCode] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const copyCode = () => {
+    navigator.clipboard?.writeText(groupId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
+
+  const submitJoin = () => {
+    onJoinGroup(joinCode)
+    setJoinCode('')
+  }
 
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
+      <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600 max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* 3-player toggle */}
         <div className="mb-4 pb-3 border-b border-green-700">
           <label className="flex items-center justify-between cursor-pointer">
@@ -439,6 +552,38 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalP
               className="w-5 h-5 accent-yellow-500"
             />
           </label>
+        </div>
+
+        {/* Group code: shared stats across devices, isolation between friend groups */}
+        <div className="mb-4 pb-3 border-b border-green-700">
+          <p className="font-semibold mb-1">Grupo</p>
+          <p className="text-xs text-green-200 mb-2">
+            Tus partidas y jugadores se guardan en este grupo. Compartí el código para ver las mismas estadísticas en otro teléfono.
+          </p>
+          <button
+            onClick={copyCode}
+            className="w-full py-1.5 mb-2 bg-green-800 border border-green-600 rounded-lg font-mono text-sm tracking-widest active:bg-green-700"
+          >
+            {copied ? '¡Copiado!' : groupId}
+          </button>
+          <div className="flex gap-2">
+            <input
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => { if (e.key === 'Enter') submitJoin() }}
+              placeholder="Código de otro grupo"
+              maxLength={12}
+              autoCapitalize="characters"
+              className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-green-800 border border-green-600 rounded-lg outline-none focus:border-yellow-500 font-mono uppercase"
+            />
+            <button
+              onClick={submitJoin}
+              disabled={joinCode.trim() === ''}
+              className="px-3 py-1.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg text-sm font-semibold flex-shrink-0 disabled:opacity-30"
+            >
+              Unirse
+            </button>
+          </div>
         </div>
 
         <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
