@@ -65,7 +65,7 @@ function App() {
   }
 
   return (
-    <div className="h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
+    <div className="app-fade h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header with safe area for notch */}
       <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
         <div className="w-7" />
@@ -113,7 +113,7 @@ function App() {
 
           {/* Otros (3-player mode) */}
           {threePlayerMode && (
-            <div className="flex-1 flex flex-col border-l border-green-700 min-h-0">
+            <div className="panel-slide-in flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
                 <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
               </div>
@@ -131,21 +131,24 @@ function App() {
         <div className="px-3 pt-3 bg-green-900 border-t border-green-700 flex-shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <button
             onClick={resetGame}
-            className="w-full py-2.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold transition-colors"
+            className="w-full py-2.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold transition active:scale-[0.98]"
           >
             Nueva Partida
           </button>
         </div>
       </main>
 
-      {/* Winner banner */}
+      {/* Winner celebration */}
       {winner && (
-        <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-          <div className="bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
-            <span>🏆</span>
-            <span>¡{winner} ganan!</span>
+        <>
+          <Confetti />
+          <div className="fixed left-4 right-4 z-50" style={{ top: 'calc(env(safe-area-inset-top) + 3rem)' }}>
+            <div className="winner-banner bg-yellow-500 text-green-900 rounded-lg px-4 py-2 text-center font-bold shadow-lg flex items-center justify-center gap-2">
+              <span className="trophy">🏆</span>
+              <span>¡{winner} ganan!</span>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Info modal */}
@@ -243,14 +246,14 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false }: ScoreP
         <button
           onClick={onDecrement}
           disabled={score === 0}
-          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed`}
         >
           −
         </button>
         <button
           onClick={onIncrement}
           disabled={score >= 30}
-          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+          className={`${buttonSize} font-bold rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-500 transition active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed`}
         >
           +
         </button>
@@ -296,6 +299,14 @@ function MatchBox({ points, active }: { points: number; active: boolean }) {
 
   const pad = 6
 
+  const matchLines: [number, number, number, number][] = [
+    [pad, pad, pad, size - pad],               // left
+    [pad, pad, size - pad, pad],               // top
+    [size - pad, pad, size - pad, size - pad], // right
+    [pad, size - pad, size - pad, size - pad], // bottom
+    [pad, pad, size - pad, size - pad],        // diagonal
+  ]
+
   return (
     <svg width={size} height={size} className="flex-shrink-0">
       {/* Box border for reference */}
@@ -308,61 +319,49 @@ function MatchBox({ points, active }: { points: number; active: boolean }) {
         rx={3}
       />
 
-      {/* Match 1: Left */}
-      {points >= 1 && (
+      {/* Matches: left, top, right, bottom, diagonal — each draws in when it appears */}
+      {matchLines.slice(0, points).map(([x1, y1, x2, y2], i) => (
         <line
-          x1={pad} y1={pad}
-          x2={pad} y2={size - pad}
+          key={i}
+          x1={x1} y1={y1}
+          x2={x2} y2={y2}
+          pathLength={1}
+          className="match-line"
           stroke={matchColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
         />
-      )}
-
-      {/* Match 2: Top */}
-      {points >= 2 && (
-        <line
-          x1={pad} y1={pad}
-          x2={size - pad} y2={pad}
-          stroke={matchColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-      )}
-
-      {/* Match 3: Right */}
-      {points >= 3 && (
-        <line
-          x1={size - pad} y1={pad}
-          x2={size - pad} y2={size - pad}
-          stroke={matchColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-      )}
-
-      {/* Match 4: Bottom */}
-      {points >= 4 && (
-        <line
-          x1={pad} y1={size - pad}
-          x2={size - pad} y2={size - pad}
-          stroke={matchColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-      )}
-
-      {/* Match 5: Diagonal */}
-      {points >= 5 && (
-        <line
-          x1={pad} y1={pad}
-          x2={size - pad} y2={size - pad}
-          stroke={matchColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-      )}
+      ))}
     </svg>
+  )
+}
+
+const CONFETTI_COLORS = ['#fbbf24', '#f59e0b', '#fde68a', '#4ade80', '#ffffff']
+
+function Confetti() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden" aria-hidden="true">
+      {Array.from({ length: 40 }, (_, i) => {
+        const left = (i * 37) % 100
+        const delay = ((i * 53) % 25) / 10
+        const duration = 2.5 + ((i * 29) % 20) / 10
+        const width = 6 + (i % 3) * 3
+        return (
+          <span
+            key={i}
+            className="confetti-piece"
+            style={{
+              left: `${left}%`,
+              width: `${width}px`,
+              height: `${width * 0.5}px`,
+              backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+              animationDelay: `${delay}s`,
+              animationDuration: `${duration}s`,
+            }}
+          />
+        )
+      })}
+    </div>
   )
 }
 
@@ -377,8 +376,8 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalP
   const isAndroid = /Android/.test(navigator.userAgent)
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
+    <div className="modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600" onClick={e => e.stopPropagation()}>
         {/* 3-player toggle */}
         <div className="mb-4 pb-3 border-b border-green-700">
           <label className="flex items-center justify-between cursor-pointer">
