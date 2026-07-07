@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { teamColor } from '../lib/teamColors'
 
 // One entry per effective score change during the game; the full log lets the
 // summary reconstruct how the match unfolded (momentum, streaks, lead changes).
@@ -25,8 +26,6 @@ interface GameSummaryProps {
   onNewGame: () => void
   onClose: () => void
 }
-
-const TEAM_COLORS = ['#fbbf24', '#7dd3fc', '#fb923c']
 
 function formatDuration(ms: number): string {
   const minutes = Math.round(ms / 60000)
@@ -124,7 +123,7 @@ function ProgressChart({ teams, timeline }: { teams: SummaryTeam[]; timeline: nu
             key={t.key}
             points={timeline.map((s, i) => `${px(i).toFixed(1)},${py(s[ti]).toFixed(1)}`).join(' ')}
             fill="none"
-            stroke={TEAM_COLORS[ti % TEAM_COLORS.length]}
+            stroke={teamColor(ti)}
             strokeWidth={2}
             strokeLinejoin="round"
           />
@@ -133,7 +132,7 @@ function ProgressChart({ teams, timeline }: { teams: SummaryTeam[]; timeline: nu
       <div className="flex justify-center gap-3 text-[0.65rem] text-green-200 mt-1">
         {teams.map((t, i) => (
           <span key={t.key} className="flex items-center gap-1 min-w-0">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLORS[i % TEAM_COLORS.length] }} />
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor(i) }} />
             <span className="truncate">{t.name}</span>
           </span>
         ))}
@@ -142,11 +141,11 @@ function ProgressChart({ teams, timeline }: { teams: SummaryTeam[]; timeline: nu
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-green-800/60 rounded-lg px-2.5 py-2">
       <p className="text-[0.65rem] text-green-300 font-semibold">{label}</p>
-      <p className="text-sm font-bold truncate">{value}</p>
+      <p className="text-sm font-bold truncate" style={color ? { color } : undefined}>{value}</p>
     </div>
   )
 }
@@ -157,14 +156,19 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
 
   const showChart = timeline.length >= 3
 
-  const statCards: { label: string; value: string }[] = []
+  // Stats that belong to a team take that team's colour — the same one its
+  // line has in the chart — so everything about a team reads consistently
+  const winnerIndex = teams.findIndex(t => t.name === winnerName)
+  const winnerColor = winnerIndex >= 0 ? teamColor(winnerIndex) : '#fbbf24'
+
+  const statCards: { label: string; value: string; color?: string }[] = []
   if (stats.duration) statCards.push({ label: '⏱ Duración', value: stats.duration })
   if (stats.bestRun) {
-    statCards.push({ label: '🔥 Mejor racha', value: `${teams[stats.bestRun.team].name} +${stats.bestRun.length}` })
+    statCards.push({ label: '🔥 Mejor racha', value: `${teams[stats.bestRun.team].name} +${stats.bestRun.length}`, color: teamColor(stats.bestRun.team) })
   }
   if (showChart) statCards.push({ label: '🔄 Cambios de líder', value: `${stats.leadChanges}` })
   if (stats.maxLead) {
-    statCards.push({ label: '📈 Máx. ventaja', value: `${teams[stats.maxLead.team].name} +${stats.maxLead.margin}` })
+    statCards.push({ label: '📈 Máx. ventaja', value: `${teams[stats.maxLead.team].name} +${stats.maxLead.margin}`, color: teamColor(stats.maxLead.team) })
   }
 
   return (
@@ -175,7 +179,7 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
       >
         <div className="text-center mb-3">
           <span className="trophy text-3xl">🏆</span>
-          <h2 className="text-lg font-bold text-yellow-400 mt-1">¡{winnerName} {teams.find(t => t.name === winnerName)?.players.length === 1 ? 'gana' : 'ganan'}!</h2>
+          <h2 className="text-lg font-bold mt-1" style={{ color: winnerColor }}>¡{winnerName} {teams.find(t => t.name === winnerName)?.players.length === 1 ? 'gana' : 'ganan'}!</h2>
         </div>
 
         {/* Final score */}
@@ -184,8 +188,8 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
             <div key={t.key} className="flex items-center gap-3">
               {i > 0 && <span className="text-green-400 text-sm">—</span>}
               <div className="text-center min-w-0">
-                <p className={`text-2xl font-black ${t.name === winnerName ? 'text-yellow-400' : 'text-green-100'}`}>{t.score}</p>
-                <p className="text-[0.65rem] text-green-300 truncate max-w-[5rem]">{t.name}</p>
+                <p className={`text-2xl font-black ${t.name === winnerName ? '' : 'opacity-60'}`} style={{ color: teamColor(i) }}>{t.score}</p>
+                <p className="text-[0.65rem] truncate max-w-[5rem]" style={{ color: teamColor(i) }}>{t.name}</p>
               </div>
             </div>
           ))}
@@ -203,7 +207,7 @@ export function GameSummary({ teams, events, winnerName, onNewGame, onClose }: G
         {statCards.length > 0 && (
           <div className="grid grid-cols-2 gap-2 mb-4">
             {statCards.map(card => (
-              <StatCard key={card.label} label={card.label} value={card.value} />
+              <StatCard key={card.label} label={card.label} value={card.value} color={card.color} />
             ))}
           </div>
         )}
