@@ -39,6 +39,25 @@ function loadEvents(): ScoreEvent[] {
   }
 }
 
+// Snapshot of a game interrupted by "Nueva Partida", so an accidental tap
+// can be undone. Kept in localStorage until the new game actually starts.
+interface GameSnapshot {
+  gameId: string | null
+  scores: Record<TeamKey, number>
+  threePlayerMode: boolean
+  events: ScoreEvent[]
+  savedAt: number
+}
+
+function loadSnapshot(): GameSnapshot | null {
+  try {
+    const raw = localStorage.getItem('truco-last-game')
+    return raw ? (JSON.parse(raw) as GameSnapshot) : null
+  } catch {
+    return null
+  }
+}
+
 function App() {
   const [nosotros, setNosotros] = useState(() => {
     const saved = localStorage.getItem('truco-nosotros')
@@ -71,6 +90,9 @@ function App() {
   // Point-by-point log of the current game, used for the end-of-game summary
   const [events, setEvents] = useState<ScoreEvent[]>(loadEvents)
   const [summaryDismissed, setSummaryDismissed] = useState(false)
+
+  // Last game interrupted by "Nueva Partida" — offered back until the new game starts
+  const [snapshot, setSnapshot] = useState<GameSnapshot | null>(loadSnapshot)
 
   // Streak: consecutive quick taps on the same team trigger a celebration
   const streakRef = useRef<{ team: string | null; count: number; last: number }>({ team: null, count: 0, last: 0 })
@@ -119,6 +141,11 @@ function App() {
     else localStorage.removeItem('truco-game-events')
   }, [events])
 
+  useEffect(() => {
+    if (snapshot) localStorage.setItem('truco-last-game', JSON.stringify(snapshot))
+    else localStorage.removeItem('truco-last-game')
+  }, [snapshot])
+
   const teams: { key: TeamKey; name: string; players: string[]; score: number }[] = [
     { key: 'nosotros', name: nosotrosName, players: nosotrosPlayers, score: nosotros },
     { key: 'ellos', name: ellosName, players: ellosPlayers, score: ellos },
@@ -128,7 +155,7 @@ function App() {
   const winnerTeam = teams.find(t => t.score >= WINNING_SCORE) ?? null
   const winner = winnerTeam?.name ?? null
 
-  const saveCurrentGame = (completed: boolean) => {
+  const saveCurrentGame = (completed: boolean): string => {
     const id = currentGameId ?? newId()
     if (!currentGameId) setCurrentGameId(id)
     const gameTeams: GameTeam[] = teams.map(({ name, players, score }) => ({ name, players, score }))
@@ -143,6 +170,7 @@ function App() {
       winner: completed ? winner : null,
       completed,
     })
+    return id
   }
 
   // Record the game as soon as someone reaches 30, and keep the record
@@ -167,6 +195,8 @@ function App() {
         ...prev,
         { team, delta: delta > 0 ? 1 : -1, at: Date.now(), scores: { ...scores, [team]: next } },
       ])
+      // First point of a new game commits to it — the interrupted game is gone
+      setSnapshot(null)
     }
 
     if (team === 'nosotros') {
@@ -199,10 +229,18 @@ function App() {
   }
 
   const resetGame = () => {
-    // A game abandoned mid-play still gets saved (as unfinished)
+    // A game abandoned mid-play still gets saved (as unfinished), and kept
+    // as a snapshot so an accidental "Nueva Partida" tap can be undone
     const hasPoints = teams.some(t => t.score > 0)
     if (!winner && hasPoints) {
-      saveCurrentGame(false)
+      const id = saveCurrentGame(false)
+      setSnapshot({
+        gameId: id,
+        scores: { nosotros, ellos, otros },
+        threePlayerMode,
+        events,
+        savedAt: Date.now(),
+      })
     }
     setCurrentGameId(null)
     setNosotros(0)
@@ -215,6 +253,20 @@ function App() {
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
     localStorage.removeItem('truco-otros')
+  }
+
+  // Bring back the game interrupted by "Nueva Partida". Reusing its id means
+  // the unfinished record in history gets updated when the game continues.
+  const restoreGame = () => {
+    if (!snapshot) return
+    setNosotros(snapshot.scores.nosotros)
+    setEllos(snapshot.scores.ellos)
+    setOtros(snapshot.scores.otros)
+    setThreePlayerMode(snapshot.threePlayerMode)
+    setCurrentGameId(snapshot.gameId)
+    setEvents(snapshot.events)
+    setSnapshot(null)
+    if (navigator.vibrate) navigator.vibrate(10)
   }
 
   const applyTeam = (team: TeamKey, name: string, players: string[]) => {
@@ -318,6 +370,24 @@ function App() {
 
         {/* Reset button with safe area for home indicator */}
         <div className="px-3 pt-3 bg-green-900 border-t border-green-700 flex-shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          {/* Offer to restore the interrupted game until the new one starts */}
+          {snapshot && !winner && (
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={restoreGame}
+                className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-400 active:bg-yellow-300 text-green-900 rounded-lg font-semibold transition active:scale-[0.98]"
+              >
+                ↩ Volver a la partida ({[snapshot.scores.nosotros, snapshot.scores.ellos, ...(snapshot.threePlayerMode ? [snapshot.scores.otros] : [])].join(' – ')})
+              </button>
+              <button
+                onClick={() => setSnapshot(null)}
+                aria-label="Descartar partida anterior"
+                className="w-11 rounded-lg bg-green-700 hover:bg-green-600 active:bg-green-500 font-bold transition flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <button
             onClick={resetGame}
             className="w-full py-2.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold transition active:scale-[0.98]"
