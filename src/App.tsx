@@ -16,6 +16,7 @@ import {
   type GameMode,
   type GameTeam,
 } from './lib/store'
+import { teamColor } from './lib/teamColors'
 
 const WINNING_SCORE = 30
 
@@ -94,13 +95,15 @@ function App() {
   // Last game interrupted by "Nueva Partida" — offered back until the new game starts
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(loadSnapshot)
 
-  // Streak: consecutive quick taps on the same team trigger a celebration
-  const streakRef = useRef<{ team: string | null; count: number; last: number }>({ team: null, count: 0, last: 0 })
+  // Streak: a run of points by the same team triggers a celebration. It lasts
+  // as long as the team keeps scoring — only a rival point or a correction
+  // breaks it, no matter how much time passes between points.
+  const streakRef = useRef<{ team: string | null; count: number }>({ team: null, count: 0 })
   const [streak, setStreak] = useState<{ team: string; count: number; id: number } | null>(null)
 
   useEffect(() => {
     if (!streak) return
-    const timer = setTimeout(() => setStreak(null), 1200)
+    const timer = setTimeout(() => setStreak(null), 2600)
     return () => clearTimeout(timer)
   }, [streak])
 
@@ -207,17 +210,17 @@ function App() {
       setOtros(prev => Math.max(0, Math.min(30, prev + delta)))
     }
 
-    const now = Date.now()
     const s = streakRef.current
     if (delta > 0) {
-      if (s.team === team && now - s.last < 2000) {
+      if (s.team === team) {
         s.count += 1
       } else {
         s.team = team
         s.count = 1
+        // A rival point silences any celebration still on screen
+        setStreak(prev => (prev && prev.team !== team ? null : prev))
       }
-      s.last = now
-      if (s.count >= 3) setStreak({ team, count: s.count, id: now })
+      if (s.count >= 3) setStreak({ team, count: s.count, id: Date.now() })
     } else {
       // A correction breaks the streak
       s.team = null
@@ -248,7 +251,7 @@ function App() {
     setOtros(0)
     setEvents([])
     setSummaryDismissed(false)
-    streakRef.current = { team: null, count: 0, last: 0 }
+    streakRef.current = { team: null, count: 0 }
     setStreak(null)
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
@@ -334,6 +337,7 @@ function App() {
               onDecrement={() => updateScore('nosotros', -1)}
               compact={threePlayerMode}
               streak={streak?.team === 'nosotros' ? streak : null}
+              color={teamColor(0)}
             />
           </div>
 
@@ -348,6 +352,7 @@ function App() {
               onDecrement={() => updateScore('ellos', -1)}
               compact={threePlayerMode}
               streak={streak?.team === 'ellos' ? streak : null}
+              color={teamColor(1)}
             />
           </div>
 
@@ -363,6 +368,7 @@ function App() {
                 onDecrement={() => updateScore('otros', -1)}
                 compact={threePlayerMode}
                 streak={streak?.team === 'otros' ? streak : null}
+                color={teamColor(2)}
               />
             </div>
           )}
@@ -473,9 +479,10 @@ interface ScorePanelProps {
   onDecrement: () => void
   compact?: boolean
   streak?: { count: number; id: number } | null
+  color: string
 }
 
-function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak = null }: ScorePanelProps) {
+function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak = null, color }: ScorePanelProps) {
   const handleTap = () => {
     if (score < 30) {
       onIncrement()
@@ -487,7 +494,7 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak =
 
   return (
     <div className="relative flex-1 flex flex-col items-center p-2 min-h-0">
-      {streak && <StreakBadge key={streak.id} count={streak.count} />}
+      {streak && <StreakBadge key={streak.id} count={streak.count} color={color} />}
       {/* Match boxes display - tappable to increment */}
       <div
         className="flex-1 flex items-center justify-center cursor-pointer active:opacity-80 w-full"
@@ -517,15 +524,22 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak =
   )
 }
 
-function StreakBadge({ count }: { count: number }) {
+function StreakBadge({ count, color }: { count: number; color: string }) {
+  // Escalating celebrations: a team on a constant run keeps unlocking new sets
   const label =
+    count >= 15 ? '👑 ¡Leyenda!' :
+    count >= 12 ? '⚡ ¡Imparables!' :
+    count >= 9 ? '🌪️ ¡Huracán!' :
     count >= 7 ? '🚀 ¡Qué paliza!' :
     count >= 5 ? '💥 ¡Vamooo!' :
     count >= 4 ? '🔥🔥' : '🔥'
 
   return (
-    <div className="streak-pop pointer-events-none absolute top-1/4 left-1/2 z-30 flex flex-col items-center bg-green-950/85 rounded-2xl px-4 py-2 border border-yellow-500/40 shadow-lg">
-      <span className="text-4xl font-black text-yellow-400 drop-shadow-lg">+{count}</span>
+    <div
+      className="streak-pop pointer-events-none absolute top-1/4 left-1/2 z-30 flex flex-col items-center bg-green-950/85 rounded-2xl px-4 py-2 border shadow-lg"
+      style={{ borderColor: `${color}66` }}
+    >
+      <span className="text-4xl font-black drop-shadow-lg" style={{ color }}>+{count}</span>
       <span className="text-lg font-bold whitespace-nowrap drop-shadow">{label}</span>
     </div>
   )
