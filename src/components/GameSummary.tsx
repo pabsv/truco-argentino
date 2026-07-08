@@ -1,8 +1,11 @@
 import { useMemo } from 'react'
 import { teamColor } from '../lib/teamColors'
 
-// One entry per effective score change during the game; the full log lets the
-// summary reconstruct how the match unfolded (momentum, streaks, lead changes).
+// One entry per point scored during the game; the full log lets the summary
+// reconstruct how the match unfolded (momentum, streaks, lead changes).
+// Corrections erase entries instead of appending drops — scores never go down
+// in truco — but logs written by older versions may still carry delta -1
+// entries, so consumers keep handling them.
 // `scores` is the board right after the change — the ground truth for charts,
 // even when the log doesn't cover the whole game (e.g. app updated mid-match).
 export interface ScoreEvent {

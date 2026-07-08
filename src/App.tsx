@@ -31,10 +31,41 @@ function loadTeamPlayers(key: TeamKey): string[] {
   }
 }
 
+// You can't lose points in truco: a minus tap is a correction, meaning the
+// point never happened. So instead of logging an impossible score drop, erase
+// the team's most recent logged point and patch the snapshots of everything
+// after it so the log always reads as a real, monotonic game.
+function cancelLastPoint(events: ScoreEvent[], team: string): ScoreEvent[] {
+  let last = -1
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].team === team && events[i].delta > 0) {
+      last = i
+      break
+    }
+  }
+  if (last === -1) return events
+  return events
+    .filter((_, i) => i !== last)
+    .map((e, i) =>
+      i >= last && e.scores
+        ? { ...e, scores: { ...e.scores, [team]: Math.max(0, (e.scores[team] ?? 0) - 1) } }
+        : e,
+    )
+}
+
+// Older logs recorded corrections as delta -1 entries; replaying each one as
+// a cancellation repairs them into the same monotonic shape
+function normalizeEvents(events: ScoreEvent[]): ScoreEvent[] {
+  return events.reduce<ScoreEvent[]>(
+    (acc, e) => (e.delta < 0 ? cancelLastPoint(acc, e.team) : [...acc, e]),
+    [],
+  )
+}
+
 function loadEvents(): ScoreEvent[] {
   try {
     const raw = localStorage.getItem('truco-game-events')
-    return raw ? (JSON.parse(raw) as ScoreEvent[]) : []
+    return raw ? normalizeEvents(JSON.parse(raw) as ScoreEvent[]) : []
   } catch {
     return []
   }
@@ -232,10 +263,12 @@ function App() {
     const scores = { nosotros, ellos, otros }
     const next = Math.max(0, Math.min(30, scores[team] + delta))
     if (next !== scores[team]) {
-      setEvents(prev => [
-        ...prev,
-        { team, delta: delta > 0 ? 1 : -1, at: Date.now(), scores: { ...scores, [team]: next } },
-      ])
+      if (delta > 0) {
+        setEvents(prev => [...prev, { team, delta: 1, at: Date.now(), scores: { ...scores, [team]: next } }])
+      } else {
+        // A correction unwrites the point rather than logging a score drop
+        setEvents(prev => cancelLastPoint(prev, team))
+      }
       // First point of a new game commits to it — the interrupted game is gone
       setSnapshot(null)
     }
@@ -317,7 +350,7 @@ function App() {
     setOtros(snapshot.scores.otros)
     setThreePlayerMode(snapshot.threePlayerMode)
     setCurrentGameId(snapshot.gameId)
-    setEvents(snapshot.events)
+    setEvents(normalizeEvents(snapshot.events))
     setSnapshot(null)
     if (navigator.vibrate) navigator.vibrate(10)
   }
