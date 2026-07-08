@@ -118,6 +118,16 @@ function App() {
     return () => clearTimeout(timer)
   }, [streak])
 
+  // The 67 moment: a streak that goes 6... and then 7 stops the game for the
+  // ceremony. Is it good? Is it bad? It's 67.
+  const [sixSeven, setSixSeven] = useState<{ team: string; id: number } | null>(null)
+
+  useEffect(() => {
+    if (!sixSeven) return
+    const timer = setTimeout(() => setSixSeven(null), 3300)
+    return () => clearTimeout(timer)
+  }, [sixSeven])
+
   useWakeLock()
 
   // Push any games queued while offline and refresh player presets from Supabase
@@ -253,13 +263,16 @@ function App() {
         s.count = 1
         // A rival point silences any celebration still on screen
         setStreak(prev => (prev && prev.team !== team ? null : prev))
+        setSixSeven(prev => (prev && prev.team !== team ? null : prev))
       }
       if (s.count >= 3) setStreak({ team, count: s.count, id: Date.now() })
+      if (s.count === 7) setSixSeven({ team, id: Date.now() })
     } else {
       // A correction breaks the streak and re-arms the celebration
       s.team = null
       s.count = 0
       setStreak(prev => (prev?.team === team ? null : prev))
+      setSixSeven(prev => (prev?.team === team ? null : prev))
       setCelebrationDismissedFor(null)
     }
 
@@ -288,6 +301,7 @@ function App() {
     setSummaryDismissed(false)
     streakRef.current = { team: null, count: 0 }
     setStreak(null)
+    setSixSeven(null)
     setCelebrationDismissedFor(null)
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
@@ -361,7 +375,15 @@ function App() {
       {/* Main content */}
       <main className="flex-1 flex flex-col min-h-0">
         {/* Score panels side by side */}
-        <div className="flex-1 flex min-h-0">
+        <div className="relative flex-1 flex min-h-0">
+          {/* Easter egg: the scoreboard itself reads 6 to 7 */}
+          {!threePlayerMode && Math.min(nosotros, ellos) === 6 && Math.max(nosotros, ellos) === 7 && (
+            <div className="six-seven-chip pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 flex items-center gap-1 bg-green-950/85 border border-yellow-500/40 rounded-full px-3 py-1 shadow-lg">
+              <span className="six-seven-hand inline-block text-sm" style={{ scale: '-1 1' }}>🫴</span>
+              <span className="text-xs font-black text-yellow-400 tracking-widest">67</span>
+              <span className="six-seven-hand six-seven-hand-alt inline-block text-sm">🫴</span>
+            </div>
+          )}
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
@@ -438,6 +460,16 @@ function App() {
           </button>
         </div>
       </main>
+
+      {/* The 67 ceremony: a streak that went 6... 7. Below the winner overlay,
+          because reaching 30 outranks even the mystical numbers */}
+      {sixSeven && (
+        <SixSevenTakeover
+          key={sixSeven.id}
+          teamName={teams.find(t => t.key === sixSeven.team)?.name ?? sixSeven.team}
+          color={teamColor(Math.max(0, (['nosotros', 'ellos', 'otros'] as const).indexOf(sixSeven.team as TeamKey)))}
+        />
+      )}
 
       {/* Winner flow: bowling celebration first, then summary, then compact banner */}
       {winner && celebrationDismissedFor !== winner && (
@@ -582,12 +614,15 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak =
 }
 
 function StreakBadge({ count, color }: { count: number; color: string }) {
-  // Escalating celebrations: a team on a constant run keeps unlocking new sets
+  // Escalating celebrations: a team on a constant run keeps unlocking new sets.
+  // 6 builds the suspense, 7 completes the prophecy (the takeover handles the rest).
   const label =
     count >= 15 ? '👑 ¡Leyenda!' :
     count >= 12 ? '⚡ ¡Imparables!' :
     count >= 9 ? '🌪️ ¡Huracán!' :
-    count >= 7 ? '🚀 ¡Qué paliza!' :
+    count >= 8 ? '🚀 ¡Qué paliza!' :
+    count === 7 ? '🫴 ¡SEIS SIETE! 🫴' :
+    count === 6 ? '6️⃣… ¿y? 👀' :
     count >= 5 ? '💥 ¡Vamooo!' :
     count >= 4 ? '🔥🔥' : '🔥'
 
@@ -598,6 +633,46 @@ function StreakBadge({ count, color }: { count: number; color: string }) {
     >
       <span className="text-4xl font-black drop-shadow-lg" style={{ color }}>+{count}</span>
       <span className="text-lg font-bold whitespace-nowrap drop-shadow">{label}</span>
+    </div>
+  )
+}
+
+// Full-screen 67 ceremony. Two giant digits weighing invisible melons, exactly
+// as the ancients foretold. Purely decorative: taps pass through, and it
+// dismisses itself before anyone can ask what it means. (Nobody knows.)
+function SixSevenTakeover({ teamName, color }: { teamName: string; color: string }) {
+  // Vibrating here (post-render) so the tap's own vibrate(10) doesn't stomp it
+  useEffect(() => {
+    if (navigator.vibrate) navigator.vibrate([67, 67, 67, 67, 67, 67, 67])
+  }, [])
+
+  return (
+    <div className="six-seven-overlay pointer-events-none fixed inset-0 z-[45] bg-black/90 flex flex-col items-center justify-center gap-2 px-4" aria-hidden="true">
+      <div className="retro-blink text-yellow-400 text-xs font-bold tracking-[0.3em] whitespace-nowrap">
+        ★ RACHA DE ★
+      </div>
+
+      {/* The digits do the alternating palms-up bob, hands included */}
+      <div className="six-seven-shake flex items-end justify-center gap-8">
+        <div className="six-seven-digit flex flex-col items-center">
+          <span className="text-[6.5rem] leading-none font-black text-yellow-400" style={{ textShadow: '5px 5px 0 #dc2626' }}>6</span>
+          <span className="text-5xl leading-none" style={{ scale: '-1 1' }}>🫴</span>
+        </div>
+        <div className="six-seven-digit six-seven-digit-alt flex flex-col items-center">
+          <span className="text-[6.5rem] leading-none font-black text-yellow-400" style={{ textShadow: '5px 5px 0 #2563eb' }}>7</span>
+          <span className="text-5xl leading-none">🫴</span>
+        </div>
+      </div>
+
+      <div className="winner-slam text-3xl font-black text-white text-center whitespace-nowrap">
+        ¡¡SEIS SIETEEEEE!!
+      </div>
+      <p className="text-green-200 text-sm font-semibold text-center">
+        ¿Es mucho? ¿Es poco? Sí. 🤷
+      </p>
+      <p className="text-sm font-bold text-center truncate max-w-full" style={{ color }}>
+        {teamName} anda pesando melones 🍈🍈
+      </p>
     </div>
   )
 }
