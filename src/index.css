@@ -72,6 +72,219 @@ input {
   animation: streak-pop 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* --- Retro bowling win screen --- */
+
+.crt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.22) 2px 4px
+  );
+}
+
+.retro-blink {
+  animation: retro-blink 0.9s steps(2) infinite;
+}
+
+@keyframes retro-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.winner-slam {
+  animation: winner-slam 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes winner-slam {
+  from {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pin-body {
+  position: relative;
+  width: 22px;
+  height: 56px;
+  background: linear-gradient(90deg, #e5e5e5, #ffffff 40%, #d4d4d4);
+  border-radius: 45% 45% 42% 42% / 60% 60% 22% 22%;
+}
+
+.pin-body::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #dc2626;
+}
+
+.pin-body::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #dc2626;
+}
+
+.pin-face {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.lane-pin {
+  position: absolute;
+  transform-origin: bottom center;
+}
+
+.bowling-ball {
+  position: absolute;
+  bottom: 12px;
+  left: -18%;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #52525b, #18181b 70%);
+  animation: ball-roll 0.9s cubic-bezier(0.4, 0, 1, 1) 0.4s both;
+}
+
+.bowling-ball::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #000;
+  box-shadow: 9px -2px 0 #000, 4px 7px 0 #000;
+}
+
+@keyframes ball-roll {
+  from {
+    transform: translateX(0) rotate(0deg);
+  }
+  to {
+    transform: translateX(min(82vw, 360px)) rotate(900deg);
+  }
+}
+
+.pin-fly-0, .pin-fly-1, .pin-fly-2, .pin-fly-3 {
+  animation-duration: 0.8s;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  animation-delay: 1.15s;
+  animation-fill-mode: forwards;
+}
+
+.pin-fly-0 { animation-name: pin-fly-0; }
+.pin-fly-1 { animation-name: pin-fly-1; }
+.pin-fly-2 { animation-name: pin-fly-2; }
+.pin-fly-3 { animation-name: pin-fly-3; }
+
+@keyframes pin-fly-0 {
+  to { transform: translate(-70px, -110px) rotate(-320deg); opacity: 0; }
+}
+@keyframes pin-fly-1 {
+  to { transform: translate(-30px, -140px) rotate(280deg); opacity: 0; }
+}
+@keyframes pin-fly-2 {
+  to { transform: translate(45px, -125px) rotate(-260deg); opacity: 0; }
+}
+@keyframes pin-fly-3 {
+  to { transform: translate(85px, -95px) rotate(340deg); opacity: 0; }
+}
+
+.strike-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.05em;
+  opacity: 0;
+  animation: strike-slam 0.35s cubic-bezier(0.22, 1, 0.36, 1) 1.25s both,
+    strike-flash 0.5s steps(2) 1.6s infinite;
+}
+
+@keyframes strike-slam {
+  from {
+    transform: scale(3) rotate(-8deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(-4deg);
+    opacity: 1;
+  }
+}
+
+@keyframes strike-flash {
+  0%, 100% {
+    color: #fbbf24;
+    text-shadow: 3px 3px 0 #dc2626;
+  }
+  50% {
+    color: #ffffff;
+    text-shadow: 3px 3px 0 #2563eb;
+  }
+}
+
+.pin-dance {
+  transform-origin: bottom center;
+  animation: pin-dance 0.7s ease-in-out infinite;
+}
+
+@keyframes pin-dance {
+  0%, 100% {
+    transform: rotate(-14deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0deg) translateY(-12px);
+  }
+  50% {
+    transform: rotate(14deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0deg) translateY(-12px);
+  }
+}
+
+.pin-cry {
+  transform-origin: bottom center;
+  animation: pin-cry 0.25s ease-in-out infinite;
+}
+
+@keyframes pin-cry {
+  0%, 100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+.fade-in-late {
+  animation: fade-in 0.5s ease-out 1.7s both;
+}
+
 @keyframes streak-pop {
   0% {
     transform: translate(-50%, 12px) scale(0.4);
@@ -195,5 +408,20 @@ input {
   .streak-pop {
     animation: none;
     transform: translateX(-50%);
+  }
+  .retro-blink,
+  .winner-slam,
+  .bowling-ball,
+  .pin-fly-0, .pin-fly-1, .pin-fly-2, .pin-fly-3,
+  .pin-dance,
+  .pin-cry,
+  .fade-in-late {
+    animation: none;
+  }
+  .strike-text {
+    animation: none;
+    opacity: 1;
+    color: #fbbf24;
+    text-shadow: 3px 3px 0 #dc2626;
   }
 }
