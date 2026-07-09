@@ -29,42 +29,11 @@ const SUPABASE_KEY = 'sb_publishable_mu6qP2qYKcX8ERjij34Slw_fhtSjQZf'
 
 const GAMES_KEY = 'truco-games'
 const PLAYERS_KEY = 'truco-players'
-const GROUP_KEY = 'truco-group'
 
-// ---------- Groups ----------
-// Each device belongs to a group (auto-created on first launch). All games
-// and player presets are tagged with the group code, so different friend
-// groups using the app never see each other's data. Sharing the code lets
-// several devices share one group's history.
-
-const GROUP_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-
-function newGroupCode(): string {
-  const rand = new Uint32Array(8)
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(rand)
-  } else {
-    for (let i = 0; i < rand.length; i++) rand[i] = Math.floor(Math.random() * 0xffffffff)
-  }
-  return [...rand].map(n => GROUP_ALPHABET[n % GROUP_ALPHABET.length]).join('')
-}
-
-export function getGroupId(): string {
-  let id = localStorage.getItem(GROUP_KEY)
-  if (!id) {
-    id = newGroupCode()
-    localStorage.setItem(GROUP_KEY, id)
-  }
-  return id
-}
-
-export function setGroupId(code: string): string {
-  const normalized = code.trim().toUpperCase()
-  localStorage.setItem(GROUP_KEY, normalized)
-  // cached presets belong to the previous group
-  localStorage.removeItem(PLAYERS_KEY)
-  return normalized
-}
+// All writes land in one shared pool. Historical rows live under many old
+// random group codes; reads ignore group_id entirely so every install sees
+// everything. 'default' is only a write-side tag, never a filter.
+const DEFAULT_GROUP = 'default'
 
 async function sbFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -100,11 +69,9 @@ function loadGames(): StoredGame[] {
   }
 }
 
-// Games of the current group only (games without a tag predate groups and
-// are treated as belonging to the current group)
-export function loadGroupGames(): StoredGame[] {
-  const group = getGroupId()
-  return loadGames().filter(g => (g.groupId ?? group) === group)
+// All locally cached games, regardless of which group they were recorded under.
+export function loadLocalGames(): StoredGame[] {
+  return loadGames()
 }
 
 function persistGames(games: StoredGame[]) {
@@ -116,12 +83,12 @@ function persistGames(games: StoredGame[]) {
 // creating a duplicate. The original playedAt is preserved on update.
 export function recordGame(game: GameRecord) {
   const games = loadGames()
-  const stored: StoredGame = { ...game, groupId: getGroupId(), synced: false }
   const idx = games.findIndex(g => g.id === game.id)
   if (idx >= 0) {
-    games[idx] = { ...stored, playedAt: games[idx].playedAt }
+    // Also preserve the original groupId — never re-tag a historical row.
+    games[idx] = { ...game, playedAt: games[idx].playedAt, groupId: games[idx].groupId ?? DEFAULT_GROUP, synced: false }
   } else {
-    games.push(stored)
+    games.push({ ...game, groupId: DEFAULT_GROUP, synced: false })
   }
   persistGames(games)
   void syncGames()
@@ -152,7 +119,7 @@ export async function syncGames(): Promise<void> {
           teams: g.teams,
           winner: g.winner,
           completed: g.completed,
-          group_id: g.groupId ?? getGroupId(),
+          group_id: g.groupId ?? DEFAULT_GROUP,
         } satisfies GameRow)),
       ),
     })
@@ -165,16 +132,15 @@ export async function syncGames(): Promise<void> {
 
 export async function fetchAllGames(): Promise<StoredGame[]> {
   await syncGames()
-  const group = getGroupId()
   try {
     const res = await sbFetch(
-      `truco_games?select=id,played_at,mode,teams,winner,completed,group_id&group_id=eq.${encodeURIComponent(group)}&order=played_at.asc`,
+      'truco_games?select=id,played_at,mode,teams,winner,completed,group_id&order=played_at.asc&limit=1000',
     )
     const remote = (await res.json()) as GameRow[]
-    const local = loadGames()
-    const otherGroups = local.filter(g => (g.groupId ?? group) !== group)
-    const byId = new Map(local.filter(g => (g.groupId ?? group) === group).map(g => [g.id, g]))
+    const byId = new Map(loadGames().map(g => [g.id, g]))
     for (const r of remote) {
+      const existing = byId.get(r.id)
+      if (existing && !existing.synced) continue // local unsynced edit wins; pushes next sync
       byId.set(r.id, {
         id: r.id,
         playedAt: r.played_at,
@@ -186,11 +152,15 @@ export async function fetchAllGames(): Promise<StoredGame[]> {
         synced: true,
       })
     }
-    const merged = [...byId.values()].sort((a, b) => a.playedAt.localeCompare(b.playedAt))
-    persistGames([...otherGroups, ...merged])
+    // Date.parse instead of string comparison: local records store "...Z"
+    // while PostgREST returns "+00:00" offsets, which don't sort as text.
+    const merged = [...byId.values()].sort(
+      (a, b) => (Date.parse(a.playedAt) || 0) - (Date.parse(b.playedAt) || 0),
+    )
+    persistGames(merged)
     return merged
   } catch {
-    return loadGroupGames()
+    return loadLocalGames()
   }
 }
 
@@ -210,19 +180,34 @@ function persistPlayers(players: string[]) {
 }
 
 export async function fetchPlayers(): Promise<string[]> {
-  const group = getGroupId()
   try {
-    const res = await sbFetch(
-      `truco_players?select=name&group_id=eq.${encodeURIComponent(group)}&order=created_at.asc`,
-    )
-    const remote = ((await res.json()) as { name: string }[]).map(p => p.name)
-    const localOnly = loadPlayers().filter(n => !remote.includes(n))
+    const res = await sbFetch('truco_players?select=name&order=created_at.asc&limit=1000')
+    const rows = (await res.json()) as { name: string }[]
+    // The same name can exist under several old group_ids (and with stray
+    // whitespace) — dedupe on the trimmed name, keeping first-seen order.
+    const seen = new Set<string>()
+    const remote: string[] = []
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (name !== '' && !seen.has(name)) {
+        seen.add(name)
+        remote.push(name)
+      }
+    }
+    const localOnly: string[] = []
+    for (const raw of loadPlayers()) {
+      const name = raw.trim()
+      if (name !== '' && !seen.has(name)) {
+        seen.add(name)
+        localOnly.push(name)
+      }
+    }
     if (localOnly.length > 0) {
       try {
         await sbFetch('truco_players?on_conflict=group_id,name', {
           method: 'POST',
           headers: { Prefer: 'resolution=merge-duplicates' },
-          body: JSON.stringify(localOnly.map(name => ({ name, group_id: group }))),
+          body: JSON.stringify(localOnly.map(name => ({ name, group_id: DEFAULT_GROUP }))),
         })
       } catch {
         // keep them local; they'll be pushed next time
@@ -237,14 +222,15 @@ export async function fetchPlayers(): Promise<string[]> {
 }
 
 export function addPlayer(name: string): string[] {
+  const trimmed = name.trim()
   const players = loadPlayers()
-  if (!players.includes(name)) {
-    players.push(name)
+  if (trimmed !== '' && !players.includes(trimmed)) {
+    players.push(trimmed)
     persistPlayers(players)
     void sbFetch('truco_players?on_conflict=group_id,name', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify([{ name, group_id: getGroupId() }]),
+      body: JSON.stringify([{ name: trimmed, group_id: DEFAULT_GROUP }]),
     }).catch(() => {})
   }
   return players
@@ -253,9 +239,10 @@ export function addPlayer(name: string): string[] {
 export function removePlayer(name: string): string[] {
   const players = loadPlayers().filter(p => p !== name)
   persistPlayers(players)
-  void sbFetch(
-    `truco_players?group_id=eq.${encodeURIComponent(getGroupId())}&name=eq.${encodeURIComponent(name)}`,
-    { method: 'DELETE' },
-  ).catch(() => {})
+  // No group filter: the name may exist under several old group_ids; delete
+  // all of them or fetchPlayers will resurrect it from a stale group row.
+  void sbFetch(`truco_players?name=eq.${encodeURIComponent(name)}`, { method: 'DELETE' }).catch(
+    () => {},
+  )
   return players
 }
