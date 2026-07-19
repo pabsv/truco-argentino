@@ -1,0 +1,257 @@
+{
+  ".claude/launch.json": {
+    "mtime": 1777758393.4833274,
+    "ast_hash": "75a2cccfa405469141e81c14755778f9",
+    "semantic_hash": "75a2cccfa405469141e81c14755778f9"
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1777761362.1001594,
+    "ast_hash": "254b09aaf117446d986ec2619294aca7",
+    "semantic_hash": "254b09aaf117446d986ec2619294aca7"
+  },
+  "eslint.config.js": {
+    "mtime": 1771788156.02108,
+    "ast_hash": "b8893da386a89dfd3672dad848f4ec7e",
+    "semantic_hash": "b8893da386a89dfd3672dad848f4ec7e"
+  },
+  "package.json": {
+    "mtime": 1784446811.277748,
+    "ast_hash": "9867f9be46624deb4dee61b482b30f3f",
+    "semantic_hash": ""
+  },
+  "src/App.tsx": {
+    "mtime": 1784447387.2027667,
+    "ast_hash": "015cd720fdb69bb7d9891fd8d2372132",
+    "semantic_hash": ""
+  },
+  "src/components/EditableTeamName.tsx": {
+    "mtime": 1777762057.181867,
+    "ast_hash": "97b0e52b8c7cb3ac19ad65de17caca44",
+    "semantic_hash": "97b0e52b8c7cb3ac19ad65de17caca44"
+  },
+  "src/components/InfoModal.tsx": {
+    "mtime": 1784447368.9472694,
+    "ast_hash": "51e1fe27894bc44ba6e6e6bbec690bf5",
+    "semantic_hash": ""
+  },
+  "src/components/MatchBoxes.tsx": {
+    "mtime": 1777762047.2361443,
+    "ast_hash": "400e039361f2f5bbddfc8070ff0d9f84",
+    "semantic_hash": "400e039361f2f5bbddfc8070ff0d9f84"
+  },
+  "src/components/ScorePanel.tsx": {
+    "mtime": 1777762052.4287713,
+    "ast_hash": "93bfc7268ab5b85a23abf554dc75e9d8",
+    "semantic_hash": "93bfc7268ab5b85a23abf554dc75e9d8"
+  },
+  "src/hooks/useWakeLock.ts": {
+    "mtime": 1777717433.1800318,
+    "ast_hash": "e60839255942aa14a3b51d9295709eb3",
+    "semantic_hash": "e60839255942aa14a3b51d9295709eb3"
+  },
+  "src/lib/supabase.ts": {
+    "mtime": 1777761899.3987432,
+    "ast_hash": "4ba7f6908435e173d458ceb8b60ec1be",
+    "semantic_hash": "4ba7f6908435e173d458ceb8b60ec1be"
+  },
+  "src/main.tsx": {
+    "mtime": 1784447391.332983,
+    "ast_hash": "e1597c3f0ed9a685ab85319bc4ef1a04",
+    "semantic_hash": ""
+  },
+  "src/screens/CasualGame.tsx": {
+    "mtime": 1784447358.824009,
+    "ast_hash": "b9685c104db6880ac680ac5c87920791",
+    "semantic_hash": ""
+  },
+  "tsconfig.app.json": {
+    "mtime": 1771788156.119633,
+    "ast_hash": "06fed9d2d293837c0571529eaae7204a",
+    "semantic_hash": "06fed9d2d293837c0571529eaae7204a"
+  },
+  "tsconfig.json": {
+    "mtime": 1771788156.1393788,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": "a3d39fa780ebff65444de257f291ce6c"
+  },
+  "tsconfig.node.json": {
+    "mtime": 1771788156.1582494,
+    "ast_hash": "eec85c9d7c6b599801557f1afd86672c",
+    "semantic_hash": "eec85c9d7c6b599801557f1afd86672c"
+  },
+  "vite.config.ts": {
+    "mtime": 1771793214.9853926,
+    "ast_hash": "dd2ef21d4f600dd13716afd74a224f2e",
+    "semantic_hash": "dd2ef21d4f600dd13716afd74a224f2e"
+  },
+  ".claude/settings.json": {
+    "mtime": 1784113471.1444855,
+    "ast_hash": "6c7e1ee8674cf1dbf47d0f74fd99a33a",
+    "semantic_hash": ""
+  },
+  "src/components/game/PlayerAssign.tsx": {
+    "mtime": 1784447194.2975838,
+    "ast_hash": "526a4a41b1e2d14aaf2c99cf0c4e53b3",
+    "semantic_hash": ""
+  },
+  "src/components/game/RecordGameBar.tsx": {
+    "mtime": 1784447206.298053,
+    "ast_hash": "d0ddfa778a48d25e3e3311210a9decf4",
+    "semantic_hash": ""
+  },
+  "src/components/layout/PageShell.tsx": {
+    "mtime": 1784447021.2141964,
+    "ast_hash": "dd14e287e9e8d9e897a82b3b86dd70a2",
+    "semantic_hash": ""
+  },
+  "src/components/layout/TabBar.tsx": {
+    "mtime": 1784447025.7474363,
+    "ast_hash": "65319ec7823b18d7e27c12bc6529808a",
+    "semantic_hash": ""
+  },
+  "src/components/roster/AddPlayerInput.tsx": {
+    "mtime": 1784447035.6809034,
+    "ast_hash": "4bd190ba84cc4ec890c894b941994efb",
+    "semantic_hash": ""
+  },
+  "src/components/roster/PlayerListItem.tsx": {
+    "mtime": 1784447044.9886265,
+    "ast_hash": "f1567b56d8d29123a500dbeafca5de5e",
+    "semantic_hash": ""
+  },
+  "src/components/stats/FilterBar.tsx": {
+    "mtime": 1784447070.4613576,
+    "ast_hash": "4fdae72ad2c94b248bce8405a329b33e",
+    "semantic_hash": ""
+  },
+  "src/components/stats/FormPanel.tsx": {
+    "mtime": 1784447112.584352,
+    "ast_hash": "1cb427cff5bd3d2c0689b3f02ca99482",
+    "semantic_hash": ""
+  },
+  "src/components/stats/HeadToHeadPanel.tsx": {
+    "mtime": 1784447122.2805426,
+    "ast_hash": "f167c90de47ae6d739e9bc6f8d0a5e46",
+    "semantic_hash": ""
+  },
+  "src/components/stats/Leaderboard.tsx": {
+    "mtime": 1784447090.0233371,
+    "ast_hash": "70f73e1908e04cddc0d3b28679826634",
+    "semantic_hash": ""
+  },
+  "src/components/stats/PartnershipsPanel.tsx": {
+    "mtime": 1784447118.2025027,
+    "ast_hash": "adba166dac8c97014d9ef474ea780000",
+    "semantic_hash": ""
+  },
+  "src/components/stats/RecentGamesList.tsx": {
+    "mtime": 1784447145.6087532,
+    "ast_hash": "71616b61ce2830c7c75d6906d9fbd34d",
+    "semantic_hash": ""
+  },
+  "src/components/stats/StatCard.tsx": {
+    "mtime": 1784447029.2200127,
+    "ast_hash": "8e818e053ae0094ed2bbd6bbba9d54eb",
+    "semantic_hash": ""
+  },
+  "src/components/stats/TrendChart.tsx": {
+    "mtime": 1784447161.2525434,
+    "ast_hash": "8b0fdc0470cdb92f3fb357180efccc4f",
+    "semantic_hash": ""
+  },
+  "src/hooks/useGameSession.ts": {
+    "mtime": 1784446958.5401652,
+    "ast_hash": "f24eba097a9696bac550c0342c93a811",
+    "semantic_hash": ""
+  },
+  "src/hooks/useStatsData.ts": {
+    "mtime": 1784446942.2858458,
+    "ast_hash": "1a4dcb3875a6ee2ba8a507ecbf7aa32d",
+    "semantic_hash": ""
+  },
+  "src/lib/games.ts": {
+    "mtime": 1784446872.6712997,
+    "ast_hash": "6e2e704b466cac923268b87e7eafd3f2",
+    "semantic_hash": ""
+  },
+  "src/lib/players.ts": {
+    "mtime": 1784446863.1853487,
+    "ast_hash": "33700dd98415e9dff2c68ddd4a04dfed",
+    "semantic_hash": ""
+  },
+  "src/lib/stats.ts": {
+    "mtime": 1784446928.7427797,
+    "ast_hash": "9fc8a83d244aa2fb7ec96dc7b17b8bf7",
+    "semantic_hash": ""
+  },
+  "src/lib/types.ts": {
+    "mtime": 1784446849.2523165,
+    "ast_hash": "ed43574b5e0acc90379355176854214b",
+    "semantic_hash": ""
+  },
+  "src/router.tsx": {
+    "mtime": 1784447383.3000844,
+    "ast_hash": "25e46f14f5b2c75b789ca42b7bf6aeb8",
+    "semantic_hash": ""
+  },
+  "src/screens/NewGameSetup.tsx": {
+    "mtime": 1784447245.556598,
+    "ast_hash": "89c733894620a9dcae663cb5db925c57",
+    "semantic_hash": ""
+  },
+  "src/screens/PlayerDetailPage.tsx": {
+    "mtime": 1784447311.966011,
+    "ast_hash": "055d481c68ef296cb0d4745007407cc9",
+    "semantic_hash": ""
+  },
+  "src/screens/RosterPage.tsx": {
+    "mtime": 1784447261.457267,
+    "ast_hash": "a5fc94c6100bf77deed6db8f3f868c3a",
+    "semantic_hash": ""
+  },
+  "src/screens/StatsPage.tsx": {
+    "mtime": 1784448698.9767716,
+    "ast_hash": "a138d3c711f4da343553665954e7f7ff",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/20260719000001_truco_stats.sql": {
+    "mtime": 1784448182.6626186,
+    "ast_hash": "825e0f13e7eb6fd504f4aec37e3d2139",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1784113471.1329505,
+    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1771788156.2009416,
+    "ast_hash": "cac141da861c855e069a9c32557458ac",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1772047150.436928,
+    "ast_hash": "2ba3046b86e0d09252ab14061d2e77e0",
+    "semantic_hash": ""
+  },
+  "public/robots.txt": {
+    "mtime": 1772047155.2596762,
+    "ast_hash": "82b6c9b9dcc3175e45de20359e2e3a95",
+    "semantic_hash": ""
+  },
+  "public/anchobasto.jpg": {
+    "mtime": 1771793066.9176104,
+    "ast_hash": "6229e5b88493c24a44718a23b815c43a",
+    "semantic_hash": ""
+  },
+  "public/favicon.svg": {
+    "mtime": 1771789105.6308923,
+    "ast_hash": "46e6d6e5906dc77bbb860c78d3437189",
+    "semantic_hash": ""
+  },
+  "public/pwa-192x192.svg": {
+    "mtime": 1771789118.2668936,
+    "ast_hash": "e7796e65a81b299366f895dd5450a49d",
+    "semantic_hash": ""
+  }
+}
