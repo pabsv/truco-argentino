@@ -1,0 +1,107 @@
+{
+  ".claude/launch.json": {
+    "mtime": 1788037784.6636126,
+    "ast_hash": "93e785f1cb5b315039a76c317040c0cd",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1788037784.6636126,
+    "ast_hash": "2108f3b212db58966f42a44e34e39eb1",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1777761362.1001594,
+    "ast_hash": "254b09aaf117446d986ec2619294aca7",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1771788156.02108,
+    "ast_hash": "b8893da386a89dfd3672dad848f4ec7e",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1788037278.9135075,
+    "ast_hash": "b0e298d0dcb29e372b3bfd18d062de38",
+    "semantic_hash": ""
+  },
+  "src/App.tsx": {
+    "mtime": 1788037750.790393,
+    "ast_hash": "865c4f52259836dd09f1469a3b62bfb7",
+    "semantic_hash": ""
+  },
+  "src/components/GameSummary.tsx": {
+    "mtime": 1788037598.6666958,
+    "ast_hash": "db56fc3c99bb4d8dde9ff08b44795945",
+    "semantic_hash": ""
+  },
+  "src/hooks/useWakeLock.ts": {
+    "mtime": 1788037278.9165418,
+    "ast_hash": "36325be4f6ba311b4ea562f1184ee406",
+    "semantic_hash": ""
+  },
+  "src/lib/teamColors.ts": {
+    "mtime": 1788037598.6732512,
+    "ast_hash": "5519e3a9a38c2b6c6f7bfe174a30e3d7",
+    "semantic_hash": ""
+  },
+  "src/main.tsx": {
+    "mtime": 1788037278.918538,
+    "ast_hash": "df3369963799e47ef5a77cdca932abf0",
+    "semantic_hash": ""
+  },
+  "tsconfig.app.json": {
+    "mtime": 1771788156.119633,
+    "ast_hash": "06fed9d2d293837c0571529eaae7204a",
+    "semantic_hash": ""
+  },
+  "tsconfig.json": {
+    "mtime": 1771788156.1393788,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": ""
+  },
+  "tsconfig.node.json": {
+    "mtime": 1771788156.1582494,
+    "ast_hash": "eec85c9d7c6b599801557f1afd86672c",
+    "semantic_hash": ""
+  },
+  "vite.config.ts": {
+    "mtime": 1771793214.9853926,
+    "ast_hash": "dd2ef21d4f600dd13716afd74a224f2e",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1788037799.6549008,
+    "ast_hash": "9f9334b86ce045d6d6fd26574c3d4bb0",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1771788156.2009416,
+    "ast_hash": "cac141da861c855e069a9c32557458ac",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1772047150.436928,
+    "ast_hash": "2ba3046b86e0d09252ab14061d2e77e0",
+    "semantic_hash": ""
+  },
+  "public/robots.txt": {
+    "mtime": 1772047155.2596762,
+    "ast_hash": "82b6c9b9dcc3175e45de20359e2e3a95",
+    "semantic_hash": ""
+  },
+  "public/anchobasto.jpg": {
+    "mtime": 1771793066.9176104,
+    "ast_hash": "6229e5b88493c24a44718a23b815c43a",
+    "semantic_hash": ""
+  },
+  "public/favicon.svg": {
+    "mtime": 1771789105.6308923,
+    "ast_hash": "46e6d6e5906dc77bbb860c78d3437189",
+    "semantic_hash": ""
+  },
+  "public/pwa-192x192.svg": {
+    "mtime": 1771789118.2668936,
+    "ast_hash": "e7796e65a81b299366f895dd5450a49d",
+    "semantic_hash": ""
+  }
+}
