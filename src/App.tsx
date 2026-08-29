@@ -1,35 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
-import { TeamPicker } from './components/TeamPicker'
-import { StatsModal } from './components/StatsModal'
 import { GameSummary, type ScoreEvent } from './components/GameSummary'
-import {
-  addPlayer,
-  fetchPlayers,
-  getGroupId,
-  loadPlayers,
-  newId,
-  recordGame,
-  removePlayer,
-  setGroupId,
-  syncGames,
-  type GameMode,
-  type GameTeam,
-} from './lib/store'
 import { teamColor } from './lib/teamColors'
 
 const WINNING_SCORE = 30
 
 type TeamKey = 'nosotros' | 'ellos' | 'otros'
-
-function loadTeamPlayers(key: TeamKey): string[] {
-  try {
-    const raw = localStorage.getItem(`truco-${key}-players`)
-    return raw ? (JSON.parse(raw) as string[]) : []
-  } catch {
-    return []
-  }
-}
 
 function loadEvents(): ScoreEvent[] {
   try {
@@ -43,7 +19,6 @@ function loadEvents(): ScoreEvent[] {
 // Snapshot of a game interrupted by "Nueva Partida", so an accidental tap
 // can be undone. Kept in localStorage until the new game actually starts.
 interface GameSnapshot {
-  gameId: string | null
   scores: Record<TeamKey, number>
   threePlayerMode: boolean
   events: ScoreEvent[]
@@ -89,15 +64,7 @@ function App() {
   const [nosotrosName, setNosotrosName] = useState(() => localStorage.getItem('truco-nosotros-name') || 'Nosotros')
   const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
   const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
-  const [nosotrosPlayers, setNosotrosPlayers] = useState<string[]>(() => loadTeamPlayers('nosotros'))
-  const [ellosPlayers, setEllosPlayers] = useState<string[]>(() => loadTeamPlayers('ellos'))
-  const [otrosPlayers, setOtrosPlayers] = useState<string[]>(() => loadTeamPlayers('otros'))
-  const [presets, setPresets] = useState<string[]>(loadPlayers)
-  const [groupId, setGroupIdState] = useState<string>(getGroupId)
-  const [currentGameId, setCurrentGameId] = useState<string | null>(() => localStorage.getItem('truco-game-id'))
-  const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
-  const [showStats, setShowStats] = useState(false)
 
   // Point-by-point log of the current game, used for the end-of-game summary
   const [events, setEvents] = useState<ScoreEvent[]>(loadEvents)
@@ -130,12 +97,6 @@ function App() {
 
   useWakeLock()
 
-  // Push any games queued while offline and refresh player presets from Supabase
-  useEffect(() => {
-    void syncGames()
-    fetchPlayers().then(setPresets)
-  }, [])
-
   useEffect(() => {
     localStorage.setItem('truco-nosotros', nosotros.toString())
     localStorage.setItem('truco-ellos', ellos.toString())
@@ -150,17 +111,6 @@ function App() {
   }, [nosotrosName, ellosName, otrosName])
 
   useEffect(() => {
-    localStorage.setItem('truco-nosotros-players', JSON.stringify(nosotrosPlayers))
-    localStorage.setItem('truco-ellos-players', JSON.stringify(ellosPlayers))
-    localStorage.setItem('truco-otros-players', JSON.stringify(otrosPlayers))
-  }, [nosotrosPlayers, ellosPlayers, otrosPlayers])
-
-  useEffect(() => {
-    if (currentGameId) localStorage.setItem('truco-game-id', currentGameId)
-    else localStorage.removeItem('truco-game-id')
-  }, [currentGameId])
-
-  useEffect(() => {
     if (events.length > 0) localStorage.setItem('truco-game-events', JSON.stringify(events))
     else localStorage.removeItem('truco-game-events')
   }, [events])
@@ -171,38 +121,13 @@ function App() {
   }, [snapshot])
 
   const teams: { key: TeamKey; name: string; players: string[]; score: number }[] = [
-    { key: 'nosotros', name: nosotrosName, players: nosotrosPlayers, score: nosotros },
-    { key: 'ellos', name: ellosName, players: ellosPlayers, score: ellos },
-    ...(threePlayerMode ? [{ key: 'otros' as TeamKey, name: otrosName, players: otrosPlayers, score: otros }] : []),
+    { key: 'nosotros', name: nosotrosName, players: [], score: nosotros },
+    { key: 'ellos', name: ellosName, players: [], score: ellos },
+    ...(threePlayerMode ? [{ key: 'otros' as TeamKey, name: otrosName, players: [], score: otros }] : []),
   ]
 
   const winnerTeam = teams.find(t => t.score >= WINNING_SCORE) ?? null
   const winner = winnerTeam?.name ?? null
-
-  const saveCurrentGame = (completed: boolean): string => {
-    const id = currentGameId ?? newId()
-    if (!currentGameId) setCurrentGameId(id)
-    const gameTeams: GameTeam[] = teams.map(({ name, players, score }) => ({ name, players, score }))
-    const mode: GameMode = threePlayerMode
-      ? 'free-for-all'
-      : gameTeams.every(t => t.players.length === 1) ? '1v1' : '2v2'
-    recordGame({
-      id,
-      playedAt: new Date().toISOString(),
-      mode,
-      teams: gameTeams,
-      winner: completed ? winner : null,
-      completed,
-    })
-    return id
-  }
-
-  // Record the game as soon as someone reaches 30, and keep the record
-  // up to date if scores get corrected while the winner banner is showing
-  useEffect(() => {
-    if (winner) saveCurrentGame(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [winner, nosotros, ellos, otros])
 
   // Open the end-of-game summary whenever a winner is decided
   useEffect(() => {
@@ -280,20 +205,17 @@ function App() {
   }
 
   const resetGame = () => {
-    // A game abandoned mid-play still gets saved (as unfinished), and kept
-    // as a snapshot so an accidental "Nueva Partida" tap can be undone
+    // A game abandoned mid-play is kept as a snapshot so an accidental
+    // "Nueva Partida" tap can be undone
     const hasPoints = teams.some(t => t.score > 0)
     if (!winner && hasPoints) {
-      const id = saveCurrentGame(false)
       setSnapshot({
-        gameId: id,
         scores: { nosotros, ellos, otros },
         threePlayerMode,
         events,
         savedAt: Date.now(),
       })
     }
-    setCurrentGameId(null)
     setNosotros(0)
     setEllos(0)
     setOtros(0)
@@ -308,58 +230,23 @@ function App() {
     localStorage.removeItem('truco-otros')
   }
 
-  // Bring back the game interrupted by "Nueva Partida". Reusing its id means
-  // the unfinished record in history gets updated when the game continues.
+  // Bring back the game interrupted by "Nueva Partida"
   const restoreGame = () => {
     if (!snapshot) return
     setNosotros(snapshot.scores.nosotros)
     setEllos(snapshot.scores.ellos)
     setOtros(snapshot.scores.otros)
     setThreePlayerMode(snapshot.threePlayerMode)
-    setCurrentGameId(snapshot.gameId)
     setEvents(snapshot.events)
     setSnapshot(null)
     if (navigator.vibrate) navigator.vibrate(10)
-  }
-
-  const applyTeam = (team: TeamKey, name: string, players: string[]) => {
-    if (team === 'nosotros') {
-      setNosotrosName(name)
-      setNosotrosPlayers(players)
-    } else if (team === 'ellos') {
-      setEllosName(name)
-      setEllosPlayers(players)
-    } else {
-      setOtrosName(name)
-      setOtrosPlayers(players)
-    }
-  }
-
-  const pickerDefaults: Record<TeamKey, { defaultName: string; name: string; players: string[] }> = {
-    nosotros: { defaultName: 'Nosotros', name: nosotrosName, players: nosotrosPlayers },
-    ellos: { defaultName: 'Ellos', name: ellosName, players: ellosPlayers },
-    otros: { defaultName: 'Otros', name: otrosName, players: otrosPlayers },
-  }
-
-  const joinGroup = (code: string) => {
-    const normalized = code.trim().toUpperCase()
-    if (normalized === '' || normalized === groupId) return
-    setGroupIdState(setGroupId(normalized))
-    setPresets([])
-    fetchPlayers().then(setPresets)
   }
 
   return (
     <div className="app-fade h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header with safe area for notch */}
       <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
-        <button
-          onClick={() => setShowStats(true)}
-          aria-label="Estadísticas"
-          className="w-7 h-7 text-sm rounded-full bg-green-600 border border-green-500 flex items-center justify-center flex-shrink-0"
-        >
-          📊
-        </button>
+        <div className="w-7" />
         <div className="flex items-center gap-2 py-1">
           <img src="/anchobasto.jpg" alt="Ancho de Basto" className="h-8 w-auto rounded" />
           <h1 className="text-lg font-bold tracking-wide">Truco</h1>
@@ -387,7 +274,7 @@ function App() {
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <TeamNameButton name={nosotrosName} onClick={() => setPickerTeam('nosotros')} />
+              <EditableTeamName name={nosotrosName} defaultName="Nosotros" onChange={setNosotrosName} />
             </div>
             <ScorePanel
               score={nosotros}
@@ -402,7 +289,7 @@ function App() {
           {/* Ellos */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <TeamNameButton name={ellosName} onClick={() => setPickerTeam('ellos')} />
+              <EditableTeamName name={ellosName} defaultName="Ellos" onChange={setEllosName} />
             </div>
             <ScorePanel
               score={ellos}
@@ -418,7 +305,7 @@ function App() {
           {threePlayerMode && (
             <div className="panel-slide-in flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-                <TeamNameButton name={otrosName} onClick={() => setPickerTeam('otros')} />
+                <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
               </div>
               <ScorePanel
                 score={otros}
@@ -520,41 +407,62 @@ function App() {
         </>
       )}
 
-      {/* Team picker (presets + custom name) */}
-      {pickerTeam && (
-        <TeamPicker
-          defaultName={pickerDefaults[pickerTeam].defaultName}
-          currentName={pickerDefaults[pickerTeam].name}
-          currentPlayers={pickerDefaults[pickerTeam].players}
-          presets={presets}
-          onAddPreset={name => setPresets(addPlayer(name))}
-          onRemovePreset={name => setPresets(removePlayer(name))}
-          onApply={(name, players) => applyTeam(pickerTeam, name, players)}
-          onClose={() => setPickerTeam(null)}
-        />
-      )}
-
-      {/* Stats modal */}
-      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
-
       {/* Info modal */}
       {showInfo && (
         <InfoModal
           onClose={() => setShowInfo(false)}
           threePlayerMode={threePlayerMode}
           onToggleThreePlayer={() => setThreePlayerMode(prev => !prev)}
-          groupId={groupId}
-          onJoinGroup={joinGroup}
         />
       )}
     </div>
   )
 }
 
-function TeamNameButton({ name, onClick }: { name: string; onClick: () => void }) {
+interface EditableTeamNameProps {
+  name: string
+  defaultName: string
+  onChange: (next: string) => void
+}
+
+function EditableTeamName({ name, defaultName, onChange }: EditableTeamNameProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    onChange(trimmed === '' ? defaultName : trimmed)
+    setEditing(false)
+  }
+
+  const cancel = () => {
+    setDraft(name)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') commit()
+          else if (e.key === 'Escape') cancel()
+        }}
+        onFocus={e => e.target.select()}
+        maxLength={12}
+        inputMode="text"
+        autoCapitalize="words"
+        className="w-full text-base font-semibold text-center bg-transparent border-b border-yellow-500/60 outline-none"
+      />
+    )
+  }
+
   return (
     <h2
-      onClick={onClick}
+      onClick={() => { setDraft(name); setEditing(true) }}
       className="text-base font-semibold cursor-pointer truncate px-2"
     >
       {name}
@@ -867,27 +775,11 @@ interface InfoModalProps {
   onClose: () => void
   threePlayerMode: boolean
   onToggleThreePlayer: () => void
-  groupId: string
-  onJoinGroup: (code: string) => void
 }
 
-function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer, groupId, onJoinGroup }: InfoModalProps) {
+function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalProps) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   const isAndroid = /Android/.test(navigator.userAgent)
-  const [joinCode, setJoinCode] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  const copyCode = () => {
-    navigator.clipboard?.writeText(groupId).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    }).catch(() => {})
-  }
-
-  const submitJoin = () => {
-    onJoinGroup(joinCode)
-    setJoinCode('')
-  }
 
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -903,38 +795,6 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer, groupId, onJ
               className="w-5 h-5 accent-yellow-500"
             />
           </label>
-        </div>
-
-        {/* Group code: shared stats across devices, isolation between friend groups */}
-        <div className="mb-4 pb-3 border-b border-green-700">
-          <p className="font-semibold mb-1">Grupo</p>
-          <p className="text-xs text-green-200 mb-2">
-            Tus partidas y jugadores se guardan en este grupo. Compartí el código para ver las mismas estadísticas en otro teléfono.
-          </p>
-          <button
-            onClick={copyCode}
-            className="w-full py-1.5 mb-2 bg-green-800 border border-green-600 rounded-lg font-mono text-sm tracking-widest active:bg-green-700"
-          >
-            {copied ? '¡Copiado!' : groupId}
-          </button>
-          <div className="flex gap-2">
-            <input
-              value={joinCode}
-              onChange={e => setJoinCode(e.target.value.toUpperCase())}
-              onKeyDown={e => { if (e.key === 'Enter') submitJoin() }}
-              placeholder="Código de otro grupo"
-              maxLength={12}
-              autoCapitalize="characters"
-              className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-green-800 border border-green-600 rounded-lg outline-none focus:border-yellow-500 font-mono uppercase"
-            />
-            <button
-              onClick={submitJoin}
-              disabled={joinCode.trim() === ''}
-              className="px-3 py-1.5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg text-sm font-semibold flex-shrink-0 disabled:opacity-30"
-            >
-              Unirse
-            </button>
-          </div>
         </div>
 
         <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
