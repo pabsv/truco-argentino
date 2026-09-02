@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Graphify knowledge graph: generated artifact, rebuilt per machine via the post-commit hook or `graphify update .`
+graphify-out/
