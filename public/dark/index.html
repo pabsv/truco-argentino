@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Truco Argentino (ícono oscuro)</title>
+    <meta name="robots" content="noindex" />
+    <link rel="manifest" href="/dark/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/dark/icon-192.png" />
+    <link rel="apple-touch-icon" href="/dark/anchobasto-dark.png" />
+    <meta name="theme-color" content="#18181b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Truco" />
+    <script>
+      // Already installed and launched from the home screen: go straight to the app.
+      if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
+        location.replace('/');
+      }
+    </script>
+    <style>
+      body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #18181b; color: #f4f4f5; font-family: system-ui, sans-serif; padding: 24px; box-sizing: border-box; text-align: center; }
+      main { max-width: 360px; }
+      img { width: 140px; height: 140px; border-radius: 32px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+      h1 { font-size: 1.4rem; margin: 20px 0 8px; }
+      p { line-height: 1.5; color: #d4d4d8; margin: 8px 0; }
+      ol { text-align: left; color: #d4d4d8; line-height: 1.6; padding-left: 20px; }
+      a.btn { display: inline-block; margin-top: 20px; padding: 12px 22px; border-radius: 12px; background: #166534; color: #fff; text-decoration: none; font-weight: 600; }
+      strong { color: #fde047; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/dark/anchobasto-dark.png" alt="Ancho de Basto, fondo oscuro" />
+      <h1>Truco con ícono oscuro</h1>
+      <p>Esta página instala la misma app con un ícono de fondo oscuro.</p>
+      <ol>
+        <li><strong>iPhone:</strong> tocá Compartir y luego <strong>Agregar a inicio</strong>.</li>
+        <li><strong>Android:</strong> menú del navegador y luego <strong>Agregar a pantalla principal</strong> o <strong>Instalar app</strong>.</li>
+      </ol>
+      <p>Hacelo desde esta página, no desde la app normal.</p>
+      <a class="btn" href="/">Abrir la app</a>
+    </main>
+  </body>
+</html>
