@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
 import { GameSummary, type ScoreEvent } from './components/GameSummary'
 import { teamColor } from './lib/teamColors'
+import { TeamPicker } from './components/TeamPicker'
+import { loadPlayers, savePlayers } from './lib/players'
 
 const WINNING_SCORE = 30
 
@@ -64,6 +66,8 @@ function App() {
   const [nosotrosName, setNosotrosName] = useState(() => localStorage.getItem('truco-nosotros-name') || 'Nosotros')
   const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
   const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
+  const [savedPlayers, setSavedPlayers] = useState<string[]>(loadPlayers)
+  const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
 
   // Point-by-point log of the current game, used for the end-of-game summary
@@ -274,7 +278,7 @@ function App() {
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={nosotrosName} defaultName="Nosotros" onChange={setNosotrosName} />
+              <TeamNameButton name={nosotrosName} onClick={() => setPickerTeam('nosotros')} />
             </div>
             <ScorePanel
               score={nosotros}
@@ -289,7 +293,7 @@ function App() {
           {/* Ellos */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={ellosName} defaultName="Ellos" onChange={setEllosName} />
+              <TeamNameButton name={ellosName} onClick={() => setPickerTeam('ellos')} />
             </div>
             <ScorePanel
               score={ellos}
@@ -305,7 +309,7 @@ function App() {
           {threePlayerMode && (
             <div className="panel-slide-in flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-                <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
+                <TeamNameButton name={otrosName} onClick={() => setPickerTeam('otros')} />
               </div>
               <ScorePanel
                 score={otros}
@@ -407,6 +411,18 @@ function App() {
         </>
       )}
 
+      {/* Team picker: saved players + free typing */}
+      {pickerTeam && (
+        <TeamPicker
+          defaultName={{ nosotros: 'Nosotros', ellos: 'Ellos', otros: 'Otros' }[pickerTeam]}
+          currentName={{ nosotros: nosotrosName, ellos: ellosName, otros: otrosName }[pickerTeam]}
+          players={savedPlayers}
+          onPlayersChange={next => { setSavedPlayers(next); savePlayers(next) }}
+          onApply={name => ({ nosotros: setNosotrosName, ellos: setEllosName, otros: setOtrosName })[pickerTeam](name)}
+          onClose={() => setPickerTeam(null)}
+        />
+      )}
+
       {/* Info modal */}
       {showInfo && (
         <InfoModal
@@ -419,52 +435,9 @@ function App() {
   )
 }
 
-interface EditableTeamNameProps {
-  name: string
-  defaultName: string
-  onChange: (next: string) => void
-}
-
-function EditableTeamName({ name, defaultName, onChange }: EditableTeamNameProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(name)
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    onChange(trimmed === '' ? defaultName : trimmed)
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(name)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => {
-          if (e.key === 'Enter') commit()
-          else if (e.key === 'Escape') cancel()
-        }}
-        onFocus={e => e.target.select()}
-        maxLength={12}
-        inputMode="text"
-        autoCapitalize="words"
-        className="w-full text-base font-semibold text-center bg-transparent border-b border-yellow-500/60 outline-none"
-      />
-    )
-  }
-
+function TeamNameButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
-    <h2
-      onClick={() => { setDraft(name); setEditing(true) }}
-      className="text-base font-semibold cursor-pointer truncate px-2"
-    >
+    <h2 onClick={onClick} className="text-base font-semibold cursor-pointer truncate px-2">
       {name}
     </h2>
   )
