@@ -131,6 +131,70 @@ input {
   50% { transform: translateY(-2px); }
 }
 
+/* --- Lightning strike on reaching las buenas --- */
+
+.lightning-overlay {
+  animation: six-seven-overlay 2.1s ease-out forwards;
+}
+
+/* Two quick sky flashes, like a real strike */
+.lightning-flash {
+  opacity: 0;
+  animation: lightning-flash 0.7s linear forwards;
+}
+
+@keyframes lightning-flash {
+  0% { opacity: 0; }
+  8% { opacity: 0.9; }
+  18% { opacity: 0.1; }
+  30% { opacity: 0.75; }
+  55% { opacity: 0.15; }
+  100% { opacity: 0; }
+}
+
+.lightning-bolt {
+  filter: drop-shadow(0 0 6px #fde047) drop-shadow(0 0 18px #facc15);
+  animation: lightning-bolt-flicker 1.6s linear forwards;
+}
+
+.lightning-bolt polyline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lightning-draw 0.18s ease-in forwards;
+}
+
+@keyframes lightning-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes lightning-bolt-flicker {
+  0%, 20% { opacity: 1; }
+  25% { opacity: 0.3; }
+  32% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.lightning-impact {
+  width: 9rem;
+  height: 9rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #fefce8 0%, #fde047aa 25%, #facc1533 55%, transparent 70%);
+  opacity: 0;
+  animation: lightning-impact 1.2s ease-out 0.15s forwards;
+}
+
+@keyframes lightning-impact {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+}
+
+/* The whole scene jolts on impact */
+.lightning-shake {
+  animation: six-seven-shake 0.12s linear 0.15s 4;
+}
+
 /* --- Retro bowling win screen --- */
 
 .crt::after {
@@ -478,9 +542,16 @@ input {
   .six-seven-digit,
   .six-seven-shake,
   .six-seven-chip,
-  .six-seven-hand {
+  .six-seven-hand,
+  .lightning-shake,
+  .lightning-impact,
+  .lightning-bolt,
+  .lightning-bolt polyline {
     animation: none;
   }
+  .lightning-bolt polyline { stroke-dashoffset: 0; }
+  /* The sky flash is too strobe-like for reduced motion */
+  .lightning-flash { display: none; }
   /* .six-seven-overlay keeps its animation: it's an opacity fade, not motion */
   .strike-text {
     animation: none;
