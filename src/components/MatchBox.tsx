@@ -20,16 +20,17 @@ function squareSegments(s: number, p: number): Seg[] {
   ]
 }
 
-// Real matches can't share a corner: lay them as a pinwheel, tail to head,
-// so each corner holds exactly one red head
-function pinwheelSegments(s: number, p: number): Seg[] {
-  const t = 7
+// Matches laid like a real hand does it: full length sides that cross a
+// little at the corners, heads going round the square (top left, top right,
+// bottom right, bottom left), so no two heads ever share a corner
+function matchSegments(s: number, p: number): Seg[] {
+  const o = 1.8 // overshoot past the corner
   return [
-    [p, s - p - t, p, p + 1],         // left, head top left
-    [p + t, p, s - p - 1, p],         // top, head top right
-    [s - p, p + t, s - p, s - p - 1], // right, head bottom right
-    [s - p - t, s - p, p + 1, s - p], // bottom, head bottom left
-    [s - p - 12, s - p - 12, p + 12, p + 12], // diagonal, head toward top left
+    [p, s - p + o, p, p - o],         // left, head top left
+    [p - o, p, s - p + o, p],         // top, head top right
+    [s - p, p - o, s - p, s - p + o], // right, head bottom right
+    [s - p + o, s - p, p - o, s - p], // bottom, head bottom left
+    [s - p - 5, s - p - 5, p + 6.5, p + 6.5], // diagonal, head toward top left
   ]
 }
 
@@ -88,38 +89,78 @@ function LineSticks({ points, active }: { points: number; active: boolean }) {
   )
 }
 
+// Tiny deterministic tilt so the square looks placed by hand, not stamped
+const MATCH_TILT = [-1.1, 0.7, -0.5, 0.9, -0.6]
+
 function MatchSticks({ points, active, uid }: { points: number; active: boolean; uid: string }) {
-  const flare = `flare-${uid}`
+  const wood = `wood-${uid}`
+  const head = `head-${uid}`
+  const shadow = `shadow-${uid}`
+  const W = 2.5 // stick thickness
+  const HL = 5.6 // head length
+  const HW = 3.7 // head width
+
+  const sticks = matchSegments(SIZE, PAD).slice(0, points).map(([x1, y1, x2, y2], i) => {
+    const len = Math.hypot(x2 - x1, y2 - y1)
+    const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI + MATCH_TILT[i]
+    const mx = (x1 + x2) / 2
+    const my = (y1 + y2) / 2
+    // Local frame: origin at the stick's middle, x along the stick, head at +x
+    return { i, len, transform: `translate(${mx} ${my}) rotate(${angle.toFixed(2)})` }
+  })
+
+  // Teardrop head: rounded tip, tapering back into the stick
+  const headPath = (len: number) => {
+    const tip = len / 2
+    const base = tip - HL
+    return `M${base} ${-W / 2} C${base + 1.6} ${-HW / 2} ${tip - 1.4} ${-HW / 2} ${tip} 0 C${tip - 1.4} ${HW / 2} ${base + 1.6} ${HW / 2} ${base} ${W / 2} Z`
+  }
+
   return (
-    <>
+    <g opacity={active ? 1 : 0.35}>
       <defs>
-        <radialGradient id={flare}>
-          <stop offset="0%" stopColor="#fff7c2" stopOpacity="1" />
-          <stop offset="45%" stopColor="#fb923c" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+        {/* Wood: lit top edge, darker underside, across the stick's width */}
+        <linearGradient id={wood} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f3dfb8" />
+          <stop offset="45%" stopColor="#dcb983" />
+          <stop offset="100%" stopColor="#a87d47" />
+        </linearGradient>
+        {/* Head: deep oxblood with a soft lit shoulder, no cartoon gloss */}
+        <radialGradient id={head} cx="0.62" cy="0.3" r="0.75">
+          <stop offset="0%" stopColor="#a8382a" />
+          <stop offset="55%" stopColor="#7a1d14" />
+          <stop offset="100%" stopColor="#4a0f0a" />
         </radialGradient>
+        <filter id={shadow} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="0.7" />
+        </filter>
       </defs>
-      {pinwheelSegments(SIZE, PAD).slice(0, points).map(([x1, y1, x2, y2], i) => {
-        const len = Math.hypot(x2 - x1, y2 - y1)
-        const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI
-        return (
-          <g key={i} transform={`translate(${x1} ${y1}) rotate(${angle})`} opacity={active ? 1 : 0.35}>
-            <g className="stick-slide">
-              {/* Shadow, wooden body, highlight */}
-              <rect x={0.6} y={-1.2} width={len - 2} height={4.2} rx={1.2} fill="#00000040" />
-              <rect x={0} y={-2.1} width={len - 2} height={4.2} rx={1.2} fill="#e3bd85" />
-              <rect x={0.5} y={-2.1} width={len - 3} height={1.3} rx={0.6} fill="#f7e1b9" opacity={0.85} />
-              {/* Red head with a glint */}
-              <ellipse cx={len - 1.6} cy={0} rx={3.8} ry={3.1} fill="#b91c1c" />
-              <ellipse cx={len - 1.2} cy={0.4} rx={3.1} ry={2.5} fill="#dc2626" />
-              <ellipse cx={len - 2.6} cy={-1.1} rx={1.3} ry={0.8} fill="#fecaca" opacity={0.85} />
-            </g>
-            {/* The strike: a quick flare on the head as it lands */}
-            <circle className="match-flare" cx={len - 1.6} cy={0} r={9} fill={`url(#${flare})`} />
+
+      {/* Soft contact shadow under every stick */}
+      <g filter={`url(#${shadow})`} opacity={0.45}>
+        {sticks.map(({ i, len, transform }) => (
+          <g key={i} transform={transform} className="stick-place">
+            <rect x={-len / 2 + 0.5} y={-W / 2 + 0.9} width={len - 0.5} height={W + 0.3} rx={0.6} fill="#000" />
           </g>
-        )
-      })}
-    </>
+        ))}
+      </g>
+
+      {/* Wooden bodies first, so every head sits on top of the stick it crosses */}
+      {sticks.map(({ i, len, transform }) => (
+        <g key={i} transform={transform} className="stick-place">
+          <rect x={-len / 2} y={-W / 2} width={len - HL + 1} height={W} rx={0.35} fill={`url(#${wood})`} />
+          {/* Grain: one faint line down the stick */}
+          <line x1={-len / 2 + 1} y1={0.25} x2={len / 2 - HL - 0.5} y2={0.35} stroke="#9a6d3a" strokeWidth={0.25} opacity={0.5} />
+        </g>
+      ))}
+      {sticks.map(({ i, len, transform }) => (
+        <g key={i} transform={transform} className="stick-place">
+          <path d={headPath(len)} fill={`url(#${head})`} />
+          {/* Fine rim where the head meets the wood */}
+          <path d={headPath(len)} fill="none" stroke="#2e0805" strokeWidth={0.3} opacity={0.6} />
+        </g>
+      ))}
+    </g>
   )
 }
 
