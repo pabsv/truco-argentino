@@ -611,6 +611,9 @@ function LightningStrike({ position, teamCount, teamName, color }: LightningStri
   )
 }
 
+// Counting squares on the scoreboard (MatchBox default is 56)
+const BOX_SIZE = 62
+
 function MatchBoxes({ score }: { score: number }) {
   const { stick } = useSkin()
   const malasScore = Math.min(score, 15)
@@ -625,6 +628,7 @@ function MatchBoxes({ score }: { score: number }) {
           points={Math.max(0, Math.min(5, malasScore - boxIndex * 5))}
           active={true}
           stick={stick}
+          size={BOX_SIZE}
         />
       ))}
 
@@ -638,6 +642,7 @@ function MatchBoxes({ score }: { score: number }) {
           points={Math.max(0, Math.min(5, buenasScore - boxIndex * 5))}
           active={score >= 15}
           stick={stick}
+          size={BOX_SIZE}
         />
       ))}
     </div>
