@@ -7,8 +7,12 @@ import { teamColor } from './lib/teamColors'
 import { useSkin } from './lib/skins'
 import { MatchBox } from './components/MatchBox'
 import { SkinsTab } from './components/SkinsTab'
+import { TeamPicker } from './components/TeamPicker'
+import { loadPlayers, savePlayers } from './lib/players'
 
 const WINNING_SCORE = 30
+// Score at which the buenas boxes light up
+const BUENAS_SCORE = 15
 
 type TeamKey = 'nosotros' | 'ellos' | 'otros'
 
@@ -69,6 +73,8 @@ function App() {
   const [nosotrosName, setNosotrosName] = useState(() => localStorage.getItem('truco-nosotros-name') || 'Nosotros')
   const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
   const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
+  const [savedPlayers, setSavedPlayers] = useState<string[]>(loadPlayers)
+  const [pickerTeam, setPickerTeam] = useState<TeamKey | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   const [showRanking, setShowRanking] = useState(false)
 
@@ -103,6 +109,15 @@ function App() {
     const timer = setTimeout(() => setSixSeven(null), 3300)
     return () => clearTimeout(timer)
   }, [sixSeven])
+
+  // Reaching las buenas calls down a lightning strike on that team's panel
+  const [lightning, setLightning] = useState<{ team: TeamKey; id: number } | null>(null)
+
+  useEffect(() => {
+    if (!lightning) return
+    const timer = setTimeout(() => setLightning(null), 2200)
+    return () => clearTimeout(timer)
+  }, [lightning])
 
   useWakeLock()
 
@@ -193,6 +208,9 @@ function App() {
       setTaunt(TAUNTS[Math.floor(Math.random() * TAUNTS.length)])
       if (navigator.vibrate) navigator.vibrate([100, 60, 100, 60, 250])
     }
+    if (delta > 0 && current < BUENAS_SCORE && current + delta >= BUENAS_SCORE) {
+      setLightning({ team, id: Date.now() })
+    }
 
     const s = streakRef.current
     if (delta > 0) {
@@ -239,6 +257,7 @@ function App() {
     streakRef.current = { team: null, count: 0 }
     setStreak(null)
     setSixSeven(null)
+    setLightning(null)
     setCelebrationDismissedFor(null)
     localStorage.removeItem('truco-nosotros')
     localStorage.removeItem('truco-ellos')
@@ -287,7 +306,7 @@ function App() {
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={nosotrosName} defaultName="Nosotros" onChange={setNosotrosName} />
+              <TeamNameButton name={nosotrosName} onClick={() => setPickerTeam('nosotros')} />
             </div>
             <ScorePanel
               score={nosotros}
@@ -302,7 +321,7 @@ function App() {
           {/* Ellos */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-              <EditableTeamName name={ellosName} defaultName="Ellos" onChange={setEllosName} />
+              <TeamNameButton name={ellosName} onClick={() => setPickerTeam('ellos')} />
             </div>
             <ScorePanel
               score={ellos}
@@ -318,7 +337,7 @@ function App() {
           {threePlayerMode && (
             <div className="panel-slide-in flex-1 flex flex-col border-l border-green-700 min-h-0">
               <div className="bg-green-900/50 py-1.5 text-center border-b border-green-700 flex-shrink-0">
-                <EditableTeamName name={otrosName} defaultName="Otros" onChange={setOtrosName} />
+                <TeamNameButton name={otrosName} onClick={() => setPickerTeam('otros')} />
               </div>
               <ScorePanel
                 score={otros}
@@ -361,6 +380,17 @@ function App() {
         </div>
       </main>
 
+      {/* Lightning strike on the team that just reached las buenas */}
+      {lightning && (
+        <LightningStrike
+          key={lightning.id}
+          position={Math.max(0, teams.findIndex(t => t.key === lightning.team))}
+          teamCount={teams.length}
+          teamName={teams.find(t => t.key === lightning.team)?.name ?? lightning.team}
+          color={teamColor(Math.max(0, (['nosotros', 'ellos', 'otros'] as const).indexOf(lightning.team)))}
+        />
+      )}
+
       {/* Winner flow: short strike intro (tap to skip), then summary, then compact banner */}
       {winner && celebrationDismissedFor !== winner && (
         <WinCelebration winner={winner} onDone={finishCelebration} />
@@ -398,6 +428,18 @@ function App() {
         </>
       )}
 
+      {/* Team picker: saved players + free typing */}
+      {pickerTeam && (
+        <TeamPicker
+          defaultName={{ nosotros: 'Nosotros', ellos: 'Ellos', otros: 'Otros' }[pickerTeam]}
+          currentName={{ nosotros: nosotrosName, ellos: ellosName, otros: otrosName }[pickerTeam]}
+          players={savedPlayers}
+          onPlayersChange={next => { setSavedPlayers(next); savePlayers(next) }}
+          onApply={name => ({ nosotros: setNosotrosName, ellos: setEllosName, otros: setOtrosName })[pickerTeam](name)}
+          onClose={() => setPickerTeam(null)}
+        />
+      )}
+
       {/* Info modal */}
       {showInfo && (
         <InfoModal
@@ -414,52 +456,9 @@ function App() {
   )
 }
 
-interface EditableTeamNameProps {
-  name: string
-  defaultName: string
-  onChange: (next: string) => void
-}
-
-function EditableTeamName({ name, defaultName, onChange }: EditableTeamNameProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(name)
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    onChange(trimmed === '' ? defaultName : trimmed)
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(name)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => {
-          if (e.key === 'Enter') commit()
-          else if (e.key === 'Escape') cancel()
-        }}
-        onFocus={e => e.target.select()}
-        maxLength={12}
-        inputMode="text"
-        autoCapitalize="words"
-        className="w-full text-base font-semibold text-center bg-transparent border-b border-yellow-500/60 outline-none"
-      />
-    )
-  }
-
+function TeamNameButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
-    <h2
-      onClick={() => { setDraft(name); setEditing(true) }}
-      className="text-base font-semibold cursor-pointer truncate px-2"
-    >
+    <h2 onClick={onClick} className="text-base font-semibold cursor-pointer truncate px-2">
       {name}
     </h2>
   )
@@ -549,6 +548,64 @@ function SixSevenChip() {
         <span className="six-seven-hand inline-block text-sm" style={{ scale: '-1 1' }}>🫴</span>
         <span className="text-xs font-black text-yellow-400 tracking-widest">67</span>
         <span className="six-seven-hand six-seven-hand-alt inline-block text-sm">🫴</span>
+      </div>
+    </div>
+  )
+}
+
+// A bolt cracks down onto the panel of the team that just reached las buenas:
+// the sky flickers, the bolt draws itself in, the impact glows, then it all
+// fades. Purely decorative, taps pass through.
+interface LightningStrikeProps {
+  position: number
+  teamCount: number
+  teamName: string
+  color: string
+}
+
+function LightningStrike({ position, teamCount, teamName, color }: LightningStrikeProps) {
+  // Vibrating here (post-render) so the tap's own vibrate(10) doesn't stomp it
+  useEffect(() => {
+    if (navigator.vibrate) navigator.vibrate([40, 50, 40, 50, 300])
+  }, [])
+
+  const left = `${((position + 0.5) / teamCount) * 100}%`
+  const bolt = '34,0 22,52 38,56 16,112 34,116 10,170 30,174 20,200'
+  const branch = '38,56 50,80 46,84 56,108'
+
+  return (
+    <div className="lightning-overlay pointer-events-none fixed inset-0 z-[46] overflow-hidden" aria-hidden="true">
+      <div className="lightning-flash absolute inset-0 bg-white" />
+
+      <div className="lightning-shake absolute inset-0">
+        <svg
+          className="lightning-bolt absolute top-0 -translate-x-1/2"
+          style={{ left, height: '62%', width: 'auto', aspectRatio: '60 / 200' }}
+          viewBox="0 0 60 200"
+        >
+          {[bolt, branch].map(points => (
+            <polyline
+              key={points}
+              points={points}
+              pathLength={1}
+              fill="none"
+              stroke="#fef9c3"
+              strokeWidth={points === bolt ? 4 : 2.5}
+              strokeLinejoin="miter"
+              strokeLinecap="round"
+            />
+          ))}
+        </svg>
+        <div className="lightning-impact absolute" style={{ left, top: '62%' }} />
+
+        <div className="absolute inset-x-3 bottom-[18%] flex flex-col items-center gap-1 bg-green-950/80 rounded-2xl px-3 py-2 shadow-lg">
+          <div className="winner-slam text-3xl font-black text-white text-center whitespace-nowrap" style={{ textShadow: '3px 3px 0 #ca8a04, 0 0 24px #fde047' }}>
+            ⚡ ¡A LAS BUENAS! ⚡
+          </div>
+          <p className="text-lg font-bold text-center truncate max-w-full drop-shadow" style={{ color }}>
+            {teamName} ya está en las buenas
+          </p>
+        </div>
       </div>
     </div>
   )
