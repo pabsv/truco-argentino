@@ -1,7 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useWakeLock } from './hooks/useWakeLock'
 import { GameSummary, type ScoreEvent } from './components/GameSummary'
+import { ShareApp } from './components/ShareApp'
+import { CardRanking } from './components/CardRanking'
 import { teamColor } from './lib/teamColors'
+import { useSkin } from './lib/skins'
+import { MatchBox } from './components/MatchBox'
+import { SkinsTab } from './components/SkinsTab'
 
 const WINNING_SCORE = 30
 
@@ -65,6 +70,7 @@ function App() {
   const [ellosName, setEllosName] = useState(() => localStorage.getItem('truco-ellos-name') || 'Ellos')
   const [otrosName, setOtrosName] = useState(() => localStorage.getItem('truco-otros-name') || 'Otros')
   const [showInfo, setShowInfo] = useState(false)
+  const [showRanking, setShowRanking] = useState(false)
 
   // Point-by-point log of the current game, used for the end-of-game summary
   const [events, setEvents] = useState<ScoreEvent[]>(loadEvents)
@@ -85,9 +91,12 @@ function App() {
     return () => clearTimeout(timer)
   }, [streak])
 
-  // The 67 moment: a streak that goes 6... and then 7 stops the game for the
-  // ceremony. Is it good? Is it bad? It's 67.
+  // The 67 moment: a streak that goes 6... and then 7 shows the 67 chip for a
+  // few seconds. Is it good? Is it bad? It's 67.
   const [sixSeven, setSixSeven] = useState<{ team: string; id: number } | null>(null)
+
+  // Skin settings (Settings > Skins): background, stick style, streaks on/off
+  const skin = useSkin()
 
   useEffect(() => {
     if (!sixSeven) return
@@ -150,6 +159,12 @@ function App() {
   // we remember who it was dismissed for so it doesn't reappear mid-correction
   const [celebrationDismissedFor, setCelebrationDismissedFor] = useState<string | null>(null)
   const [taunt, setTaunt] = useState(TAUNTS[0])
+
+  // Stable so the intro's auto-advance timer isn't restarted on every render
+  const finishCelebration = useCallback(() => {
+    setCelebrationDismissedFor(winner)
+    setSummaryDismissed(false)
+  }, [winner])
 
   const updateScore = (team: 'nosotros' | 'ellos' | 'otros', delta: number) => {
     // Log the change only if it actually moves the score (clamped at 0 and 30),
@@ -243,7 +258,7 @@ function App() {
   }
 
   return (
-    <div className="app-fade h-dvh bg-green-800 flex flex-col text-white overflow-hidden touch-none">
+    <div className="app-fade fixed inset-0 bg-green-800 flex flex-col text-white overflow-hidden touch-none">
       {/* Header with safe area for notch */}
       <header className="bg-green-900 px-3 border-b border-green-700 flex-shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))' }}>
         <div className="w-7" />
@@ -263,13 +278,11 @@ function App() {
       <main className="flex-1 flex flex-col min-h-0">
         {/* Score panels side by side */}
         <div className="relative flex-1 flex min-h-0">
-          {/* Easter egg: the scoreboard itself reads 6 to 7 */}
-          {!threePlayerMode && Math.min(nosotros, ellos) === 6 && Math.max(nosotros, ellos) === 7 && (
-            <div className="six-seven-chip pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 flex items-center gap-1 bg-green-950/85 border border-yellow-500/40 rounded-full px-3 py-1 shadow-lg">
-              <span className="six-seven-hand inline-block text-sm" style={{ scale: '-1 1' }}>🫴</span>
-              <span className="text-xs font-black text-yellow-400 tracking-widest">67</span>
-              <span className="six-seven-hand six-seven-hand-alt inline-block text-sm">🫴</span>
-            </div>
+          {/* The 67 chip: shows while the scoreboard reads 6 to 7, and for a few
+              seconds after a streak goes 6... 7. Subtle on purpose: taps pass
+              through and the game never stops for it */}
+          {((!threePlayerMode && Math.min(nosotros, ellos) === 6 && Math.max(nosotros, ellos) === 7) || (skin.streaks && sixSeven)) && (
+            <SixSevenChip key={(skin.streaks && sixSeven?.id) || 'score'} />
           )}
           {/* Nosotros */}
           <div className="flex-1 flex flex-col border-r border-green-700 min-h-0">
@@ -281,7 +294,7 @@ function App() {
               onIncrement={() => updateScore('nosotros', 1)}
               onDecrement={() => updateScore('nosotros', -1)}
               compact={threePlayerMode}
-              streak={streak?.team === 'nosotros' ? streak : null}
+              streak={skin.streaks && streak?.team === 'nosotros' ? streak : null}
               color={teamColor(0)}
             />
           </div>
@@ -296,7 +309,7 @@ function App() {
               onIncrement={() => updateScore('ellos', 1)}
               onDecrement={() => updateScore('ellos', -1)}
               compact={threePlayerMode}
-              streak={streak?.team === 'ellos' ? streak : null}
+              streak={skin.streaks && streak?.team === 'ellos' ? streak : null}
               color={teamColor(1)}
             />
           </div>
@@ -312,7 +325,7 @@ function App() {
                 onIncrement={() => updateScore('otros', 1)}
                 onDecrement={() => updateScore('otros', -1)}
                 compact={threePlayerMode}
-                streak={streak?.team === 'otros' ? streak : null}
+                streak={skin.streaks && streak?.team === 'otros' ? streak : null}
                 color={teamColor(2)}
               />
             </div>
@@ -348,32 +361,9 @@ function App() {
         </div>
       </main>
 
-      {/* The 67 ceremony: a streak that went 6... 7. Below the winner overlay,
-          because reaching 30 outranks even the mystical numbers */}
-      {sixSeven && (
-        <SixSevenTakeover
-          key={sixSeven.id}
-          teamName={teams.find(t => t.key === sixSeven.team)?.name ?? sixSeven.team}
-          color={teamColor(Math.max(0, (['nosotros', 'ellos', 'otros'] as const).indexOf(sixSeven.team as TeamKey)))}
-        />
-      )}
-
-      {/* Winner flow: bowling celebration first, then summary, then compact banner */}
+      {/* Winner flow: short strike intro (tap to skip), then summary, then compact banner */}
       {winner && celebrationDismissedFor !== winner && (
-        <WinCelebration
-          winner={winner}
-          loser={loser}
-          taunt={taunt}
-          onReset={resetGame}
-          onShowSummary={() => {
-            setCelebrationDismissedFor(winner)
-            setSummaryDismissed(false)
-          }}
-          onDismiss={() => {
-            setCelebrationDismissedFor(winner)
-            setSummaryDismissed(true)
-          }}
-        />
+        <WinCelebration winner={winner} onDone={finishCelebration} />
       )}
 
       {/* End-of-game summary with momentum and highlights */}
@@ -384,6 +374,7 @@ function App() {
             teams={teams}
             events={events}
             winnerName={winner}
+            taunt={loser ? `¡${loser}, ${taunt}!` : null}
             onNewGame={resetGame}
             onClose={() => setSummaryDismissed(true)}
           />
@@ -413,8 +404,12 @@ function App() {
           onClose={() => setShowInfo(false)}
           threePlayerMode={threePlayerMode}
           onToggleThreePlayer={() => setThreePlayerMode(prev => !prev)}
+          onShowRanking={() => { setShowInfo(false); setShowRanking(true) }}
         />
       )}
+
+      {/* Card order sheet (landscape) */}
+      {showRanking && <CardRanking onClose={() => setShowRanking(false)} />}
     </div>
   )
 }
@@ -523,7 +518,7 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak =
 
 function StreakBadge({ count, color }: { count: number; color: string }) {
   // Escalating celebrations: a team on a constant run keeps unlocking new sets.
-  // 6 builds the suspense, 7 completes the prophecy (the takeover handles the rest).
+  // 6 builds the suspense, 7 completes the prophecy (and drops the 67 chip on the board).
   const label =
     count >= 15 ? '👑 ¡Leyenda!' :
     count >= 12 ? '⚡ ¡Imparables!' :
@@ -545,47 +540,22 @@ function StreakBadge({ count, color }: { count: number; color: string }) {
   )
 }
 
-// Full-screen 67 ceremony. Two giant digits weighing invisible melons, exactly
-// as the ancients foretold. Purely decorative: taps pass through, and it
-// dismisses itself before anyone can ask what it means. (Nobody knows.)
-function SixSevenTakeover({ teamName, color }: { teamName: string; color: string }) {
-  // Vibrating here (post-render) so the tap's own vibrate(10) doesn't stomp it
-  useEffect(() => {
-    if (navigator.vibrate) navigator.vibrate([67, 67, 67, 67, 67, 67, 67])
-  }, [])
-
+// Small bouncing "67" chip at the top of the scoreboard, palms weighing
+// invisible melons. Purely decorative.
+function SixSevenChip() {
   return (
-    <div className="six-seven-overlay pointer-events-none fixed inset-0 z-[45] bg-black/90 flex flex-col items-center justify-center gap-2 px-4" aria-hidden="true">
-      <div className="retro-blink text-yellow-400 text-xs font-bold tracking-[0.3em] whitespace-nowrap">
-        ★ RACHA DE ★
+    <div className="six-seven-chip pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2" aria-hidden="true">
+      <div className="six-seven-bounce flex items-center gap-1 bg-green-950/85 border border-yellow-500/40 rounded-full px-3 py-1 shadow-lg">
+        <span className="six-seven-hand inline-block text-sm" style={{ scale: '-1 1' }}>🫴</span>
+        <span className="text-xs font-black text-yellow-400 tracking-widest">67</span>
+        <span className="six-seven-hand six-seven-hand-alt inline-block text-sm">🫴</span>
       </div>
-
-      {/* The digits do the alternating palms-up bob, hands included */}
-      <div className="six-seven-shake flex items-end justify-center gap-8">
-        <div className="six-seven-digit flex flex-col items-center">
-          <span className="text-[6.5rem] leading-none font-black text-yellow-400" style={{ textShadow: '5px 5px 0 #dc2626' }}>6</span>
-          <span className="text-5xl leading-none" style={{ scale: '-1 1' }}>🫴</span>
-        </div>
-        <div className="six-seven-digit six-seven-digit-alt flex flex-col items-center">
-          <span className="text-[6.5rem] leading-none font-black text-yellow-400" style={{ textShadow: '5px 5px 0 #2563eb' }}>7</span>
-          <span className="text-5xl leading-none">🫴</span>
-        </div>
-      </div>
-
-      <div className="winner-slam text-3xl font-black text-white text-center whitespace-nowrap">
-        ¡¡SEIS SIETEEEEE!!
-      </div>
-      <p className="text-green-200 text-sm font-semibold text-center">
-        ¿Es mucho? ¿Es poco? Sí. 🤷
-      </p>
-      <p className="text-sm font-bold text-center truncate max-w-full" style={{ color }}>
-        {teamName} anda pesando melones 🍈🍈
-      </p>
     </div>
   )
 }
 
 function MatchBoxes({ score }: { score: number }) {
+  const { stick } = useSkin()
   const malasScore = Math.min(score, 15)
   const buenasScore = Math.max(0, score - 15)
 
@@ -597,6 +567,7 @@ function MatchBoxes({ score }: { score: number }) {
           key={`malas-${boxIndex}`}
           points={Math.max(0, Math.min(5, malasScore - boxIndex * 5))}
           active={true}
+          stick={stick}
         />
       ))}
 
@@ -609,53 +580,10 @@ function MatchBoxes({ score }: { score: number }) {
           key={`buenas-${boxIndex}`}
           points={Math.max(0, Math.min(5, buenasScore - boxIndex * 5))}
           active={score >= 15}
+          stick={stick}
         />
       ))}
     </div>
-  )
-}
-
-function MatchBox({ points, active }: { points: number; active: boolean }) {
-  const size = 56
-  const strokeWidth = 4
-  const matchColor = active ? '#fbbf24' : '#ffffff30'
-
-  const pad = 6
-
-  const matchLines: [number, number, number, number][] = [
-    [pad, pad, pad, size - pad],               // left
-    [pad, pad, size - pad, pad],               // top
-    [size - pad, pad, size - pad, size - pad], // right
-    [pad, size - pad, size - pad, size - pad], // bottom
-    [pad, pad, size - pad, size - pad],        // diagonal
-  ]
-
-  return (
-    <svg width={size} height={size} className="flex-shrink-0">
-      {/* Box border for reference */}
-      <rect
-        x={pad} y={pad}
-        width={size - pad * 2} height={size - pad * 2}
-        fill="none"
-        stroke="#ffffff20"
-        strokeWidth={1}
-        rx={3}
-      />
-
-      {/* Matches: left, top, right, bottom, diagonal — each draws in when it appears */}
-      {matchLines.slice(0, points).map(([x1, y1, x2, y2], i) => (
-        <line
-          key={i}
-          x1={x1} y1={y1}
-          x2={x2} y2={y2}
-          pathLength={1}
-          className="match-line"
-          stroke={matchColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-      ))}
-    </svg>
   )
 }
 
@@ -688,26 +616,31 @@ function Confetti({ zClass = 'z-40' }: { zClass?: string }) {
   )
 }
 
-function Pin({ face, className = '' }: { face?: string; className?: string }) {
-  return (
-    <div className={`pin-body ${className}`}>
-      {face && <span className="pin-face">{face}</span>}
-    </div>
-  )
+function Pin() {
+  return <div className="pin-body" />
 }
 
 interface WinCelebrationProps {
   winner: string
-  loser: string | null
-  taunt: string
-  onReset: () => void
-  onShowSummary: () => void
-  onDismiss: () => void
+  onDone: () => void
 }
 
-function WinCelebration({ winner, loser, taunt, onReset, onShowSummary, onDismiss }: WinCelebrationProps) {
+// How long the strike intro plays before handing over to the summary
+const CELEBRATION_MS = 2800
+
+// Short bowling-alley intro; a tap anywhere skips straight to the summary
+function WinCelebration({ winner, onDone }: WinCelebrationProps) {
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const id = setTimeout(onDone, reduced ? 1200 : CELEBRATION_MS)
+    return () => clearTimeout(id)
+  }, [onDone])
+
   return (
-    <div className="crt fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center gap-1 overflow-hidden px-4">
+    <div
+      className="crt fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center gap-1 overflow-hidden px-4 cursor-pointer select-none"
+      onClick={onDone}
+    >
       <Confetti zClass="z-[60]" />
 
       <div className="retro-blink text-yellow-400 text-sm font-bold tracking-[0.3em] whitespace-nowrap">
@@ -729,44 +662,7 @@ function WinCelebration({ winner, loser, taunt, onReset, onShowSummary, onDismis
         <div className="strike-text">¡STRIKE!</div>
       </div>
 
-      {/* Winner pin dances, loser pin cries */}
-      <div className="fade-in-late flex flex-col items-center gap-1">
-        <div className="flex items-end gap-10">
-          <div className="flex flex-col items-center gap-1">
-            <div className="pin-dance"><Pin face="😎" /></div>
-            <span className="text-yellow-400 text-xs font-bold max-w-24 truncate">{winner}</span>
-          </div>
-          {loser && (
-            <div className="flex flex-col items-center gap-1">
-              <div className="pin-cry"><Pin face="😭" /></div>
-              <span className="text-green-200 text-xs font-bold max-w-24 truncate">{loser}</span>
-            </div>
-          )}
-        </div>
-        {loser && (
-          <p className="text-yellow-300 font-bold text-lg text-center">
-            ¡{loser}, {taunt}!
-          </p>
-        )}
-      </div>
-
-      <div className="fade-in-late w-full max-w-xs flex flex-col items-center gap-2 mt-2">
-        <button
-          onClick={onReset}
-          className="w-full py-2.5 bg-yellow-500 text-green-950 rounded-lg font-bold transition active:scale-[0.98]"
-        >
-          Nueva Partida
-        </button>
-        <button
-          onClick={onShowSummary}
-          className="w-full py-2 bg-green-800 border border-green-600 rounded-lg font-semibold transition active:scale-[0.98]"
-        >
-          Ver resumen 📈
-        </button>
-        <button onClick={onDismiss} className="text-green-300 underline text-sm py-1">
-          corregir puntaje
-        </button>
-      </div>
+      <p className="tap-hint text-green-300/70 text-xs mt-4">toca para continuar</p>
     </div>
   )
 }
@@ -775,15 +671,41 @@ interface InfoModalProps {
   onClose: () => void
   threePlayerMode: boolean
   onToggleThreePlayer: () => void
+  onShowRanking: () => void
 }
 
-function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalProps) {
+function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer, onShowRanking }: InfoModalProps) {
+  const [tab, setTab] = useState<'general' | 'skins'>(() =>
+    sessionStorage.getItem('truco-settings-tab') === 'skins' ? 'skins' : 'general',
+  )
+  const pickTab = (t: 'general' | 'skins') => {
+    setTab(t)
+    try { sessionStorage.setItem('truco-settings-tab', t) } catch { /* private mode */ }
+  }
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   const isAndroid = /Android/.test(navigator.userAgent)
 
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="modal-card bg-green-900 rounded-xl p-5 max-w-xs w-full border border-green-600 max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {/* Tabs */}
+        <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 p-1 rounded-xl bg-green-950/60 border border-green-700">
+          {([['general', '⚙️ General'], ['skins', '🎨 Skins']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => pickTab(id)}
+              className={`py-1.5 rounded-lg text-sm font-bold transition ${
+                tab === id ? 'bg-yellow-500 text-green-950 shadow' : 'text-green-100 active:bg-green-800'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'skins' ? <SkinsTab /> : <>
         {/* 3-player toggle */}
         <div className="mb-4 pb-3 border-b border-green-700">
           <label className="flex items-center justify-between cursor-pointer">
@@ -796,6 +718,15 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalP
             />
           </label>
         </div>
+
+        <button
+          onClick={onShowRanking}
+          className="w-full mb-4 py-2 bg-yellow-500 hover:bg-yellow-400 active:bg-yellow-300 text-green-950 rounded-lg font-bold flex items-center justify-center gap-2"
+        >
+          <span aria-hidden="true">🃏</span> Card order
+        </button>
+
+        <ShareApp />
 
         <h2 className="text-lg font-bold mb-3 text-center">Add to Home Screen</h2>
 
@@ -821,10 +752,11 @@ function InfoModal({ onClose, threePlayerMode, onToggleThreePlayer }: InfoModalP
             </ol>
           </div>
         )}
+        </>}
 
         <button
           onClick={onClose}
-          className="w-full mt-2 py-2 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold"
+          className="w-full mt-4 py-2 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-lg font-semibold"
         >
           Close
         </button>

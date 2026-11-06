@@ -7,7 +7,7 @@
 }
 
 html {
-  background-color: #166534;
+  background-color: var(--color-green-900);
 }
 
 html, body, #root {
@@ -74,46 +74,8 @@ input {
 
 /* --- The 67 ceremony --- */
 
-/* Flash in, hold the moment, fade before anyone can ask what it meant */
-.six-seven-overlay {
-  animation: six-seven-overlay 3.2s ease-out forwards;
-}
-
-@keyframes six-seven-overlay {
-  0% { opacity: 0; }
-  5% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* Each digit bobs like a palm weighing an invisible melon; the second one
-   runs in counter-phase, as the gesture demands */
-.six-seven-digit {
-  animation: six-seven-bob 0.6s ease-in-out infinite;
-}
-
-.six-seven-digit-alt {
-  animation-delay: -0.3s;
-}
-
-@keyframes six-seven-bob {
-  0%, 100% { transform: translateY(0) rotate(-5deg); }
-  50% { transform: translateY(-18px) rotate(5deg); }
-}
-
-/* The screen itself can barely contain the numbers */
-.six-seven-shake {
-  animation: six-seven-shake 0.35s linear 3;
-}
-
-@keyframes six-seven-shake {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(-4px, 2px); }
-  50% { transform: translate(4px, -2px); }
-  75% { transform: translate(-2px, -3px); }
-}
-
-/* Scoreboard-reads-6-to-7 easter egg: drops in, hands keep the count honest */
+/* 67 chip (score reads 6 to 7, or a 6... 7 streak): drops in, then keeps
+   bouncing while the hands keep the count honest */
 .six-seven-chip {
   animation: banner-drop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -124,6 +86,16 @@ input {
 
 .six-seven-hand-alt {
   animation-delay: -0.3s;
+}
+
+.six-seven-bounce {
+  animation: six-seven-bounce 0.9s ease-in-out 0.4s infinite;
+}
+
+@keyframes six-seven-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-5px) scale(1.06); }
+  55% { transform: translateY(0) scale(1); }
 }
 
 @keyframes six-seven-hand-bob {
@@ -196,15 +168,6 @@ input {
   right: 0;
   height: 3px;
   background: #dc2626;
-}
-
-.pin-face {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 13px;
-  line-height: 1;
 }
 
 .lane-pin {
@@ -306,42 +269,25 @@ input {
   }
 }
 
-.pin-dance {
-  transform-origin: bottom center;
-  animation: pin-dance 0.7s ease-in-out infinite;
+.tap-hint {
+  animation: fade-in 0.5s ease-out 1.2s both;
 }
 
-@keyframes pin-dance {
-  0%, 100% {
-    transform: rotate(-14deg) translateY(0);
-  }
-  25% {
-    transform: rotate(0deg) translateY(-12px);
-  }
-  50% {
-    transform: rotate(14deg) translateY(0);
-  }
-  75% {
-    transform: rotate(0deg) translateY(-12px);
+/* Summary chart: lines draw in, then markers pop up */
+.chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: chart-draw 1.4s ease-out 0.25s forwards;
+}
+
+@keyframes chart-draw {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
-.pin-cry {
-  transform-origin: bottom center;
-  animation: pin-cry 0.25s ease-in-out infinite;
-}
-
-@keyframes pin-cry {
-  0%, 100% {
-    transform: rotate(-3deg);
-  }
-  50% {
-    transform: rotate(3deg);
-  }
-}
-
-.fade-in-late {
-  animation: fade-in 0.5s ease-out 1.7s both;
+.chart-pop {
+  animation: fade-in 0.4s ease-out 1.5s both;
 }
 
 @keyframes streak-pop {
@@ -379,6 +325,56 @@ input {
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* --- Skins: stick styles (see src/components/MatchBox.tsx) --- */
+
+/* The strike flare only exists as an animation; static it stays invisible */
+.match-flare {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Chalk is slower than a pen stroke */
+  .chalk-line {
+    animation-duration: 0.28s;
+  }
+
+  /* A match slides in tail first (origin = the tail, the local 0 0) */
+  .stick-slide {
+    animation: stick-slide 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+
+  .match-flare {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: match-flare 0.55s ease-out 0.12s both;
+  }
+
+  /* Neon tubes stutter on like a bar sign */
+  .neon-flicker {
+    animation: neon-flicker 0.5s steps(1, end) both;
+  }
+}
+
+@keyframes stick-slide {
+  from { transform: scaleX(0.15); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes match-flare {
+  0% { opacity: 0; transform: scale(0.3); }
+  25% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+
+@keyframes neon-flicker {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  25% { opacity: 0.2; }
+  40% { opacity: 1; }
+  50% { opacity: 0.45; }
+  60%, 100% { opacity: 1; }
 }
 
 @keyframes fade-in {
@@ -472,16 +468,17 @@ input {
   .winner-slam,
   .bowling-ball,
   .pin-fly-0, .pin-fly-1, .pin-fly-2, .pin-fly-3,
-  .pin-dance,
-  .pin-cry,
-  .fade-in-late,
-  .six-seven-digit,
-  .six-seven-shake,
+  .tap-hint,
+  .chart-pop,
   .six-seven-chip,
+  .six-seven-bounce,
   .six-seven-hand {
     animation: none;
   }
-  /* .six-seven-overlay keeps its animation: it's an opacity fade, not motion */
+  .chart-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
   .strike-text {
     animation: none;
     opacity: 1;
