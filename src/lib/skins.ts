@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
+import { isHex, scaleFrom } from './color'
 
-// Skins: how the table looks. Three independent knobs (background, stick
-// style, streak celebrations) plus a few preset combos that set the first two
+// Skins: how the table looks. Independent knobs (background, stick style and
+// its colour, streak celebrations) plus a few preset combos that set the first two
 // in one tap. Stored per device in localStorage; nothing is synced.
 //
 // Backgrounds work by overriding Tailwind's green scale (--color-green-*) on
@@ -9,7 +10,7 @@ import { useSyncExternalStore } from 'react'
 // reads those variables, so a palette re-themes the whole screen (modals
 // included) without touching any className.
 
-export type BackgroundId = 'pano' | 'madera' | 'pizarra' | 'noche' | 'bordo' | 'petroleo' | 'carbon'
+export type BackgroundId = 'pano' | 'madera' | 'pizarra' | 'noche' | 'bordo' | 'petroleo' | 'carbon' | 'custom'
 export type StickId = 'linea' | 'fosforo' | 'tiza' | 'neon'
 
 type Shade = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950
@@ -68,14 +69,21 @@ export interface StickStyle {
   id: StickId
   name: string
   hint: string
+  // Colour the style is drawn in when the player has not picked one (for
+  // the matches this is the head)
+  color: string
 }
 
 export const STICKS: StickStyle[] = [
-  { id: 'linea', name: 'Líneas', hint: 'Trazo amarillo, el de siempre' },
-  { id: 'fosforo', name: 'Fósforos', hint: 'Como en la mesa del bar' },
-  { id: 'tiza', name: 'Tiza', hint: 'A mano, en el pizarrón' },
-  { id: 'neon', name: 'Neón', hint: 'Brilla en la oscuridad' },
+  { id: 'linea', name: 'Líneas', hint: 'Trazo amarillo, el de siempre', color: '#fbbf24' },
+  { id: 'fosforo', name: 'Fósforos', hint: 'Como en la mesa del bar', color: '#7a1d14' },
+  { id: 'tiza', name: 'Tiza', hint: 'A mano, en el pizarrón', color: '#f8fafc' },
+  { id: 'neon', name: 'Neón', hint: 'Brilla en la oscuridad', color: '#f472b6' },
 ]
+
+// Quick picks offered for every stick style, next to its own colour and a
+// free colour wheel
+export const STICK_PALETTE = ['#fbbf24', '#fb923c', '#f87171', '#f472b6', '#c084fc', '#60a5fa', '#22d3ee', '#4ade80', '#a3e635', '#f8fafc']
 
 export interface SkinPreset {
   id: string
@@ -99,10 +107,14 @@ export interface SkinSettings {
   stick: StickId
   // Streak badges and the 6... 7 streak chip. Off = a quiet scoreboard.
   streaks: boolean
+  // Picked colour per stick style; a missing entry keeps the style's own
+  stickColors: Partial<Record<StickId, string>>
+  // Base colour for the 'custom' background (its panel shade)
+  customBg: string
 }
 
 const STORAGE_KEY = 'truco-skin'
-const DEFAULT_SKIN: SkinSettings = { background: 'pano', stick: 'linea', streaks: true }
+const DEFAULT_SKIN: SkinSettings = { background: 'pano', stick: 'linea', streaks: true, stickColors: {}, customBg: '#1e3a5f' }
 
 function read(): SkinSettings {
   try {
@@ -110,9 +122,13 @@ function read(): SkinSettings {
     if (!raw) return DEFAULT_SKIN
     const parsed = JSON.parse(raw) as Partial<SkinSettings>
     return {
-      background: BACKGROUNDS.some(b => b.id === parsed.background) ? parsed.background! : DEFAULT_SKIN.background,
+      background: parsed.background === 'custom' || BACKGROUNDS.some(b => b.id === parsed.background) ? parsed.background! : DEFAULT_SKIN.background,
       stick: STICKS.some(s => s.id === parsed.stick) ? parsed.stick! : DEFAULT_SKIN.stick,
       streaks: typeof parsed.streaks === 'boolean' ? parsed.streaks : DEFAULT_SKIN.streaks,
+      stickColors: Object.fromEntries(
+        STICKS.filter(st => isHex(parsed.stickColors?.[st.id])).map(st => [st.id, parsed.stickColors![st.id]]),
+      ),
+      customBg: isHex(parsed.customBg) ? parsed.customBg : DEFAULT_SKIN.customBg,
     }
   } catch {
     return DEFAULT_SKIN
@@ -131,7 +147,7 @@ export function setSkin(patch: Partial<SkinSettings>) {
   } catch {
     // private mode: the skin still applies for this session
   }
-  applyBackground(current.background)
+  applyBackground(current)
   listeners.forEach(l => l())
 }
 
@@ -145,14 +161,31 @@ export function useSkin(): SkinSettings {
   )
 }
 
+// Colour a stick style is drawn in: the player's pick, else the style's own
+export function stickColor(skin: SkinSettings, stick: StickId = skin.stick): string {
+  return skin.stickColors[stick] ?? STICKS.find(s => s.id === stick)!.color
+}
+
+// Background entry for the custom colour, built from the picked base
+export function customBackground(hex: string): Background {
+  const scale = scaleFrom(hex)
+  return { id: 'custom', name: 'A elección', scale, swatch: scale[800] }
+}
+
 export function presetFor(skin: SkinSettings): SkinPreset | null {
+  if (skin.stickColors[skin.stick]) return null
   return PRESETS.find(p => p.background === skin.background && p.stick === skin.stick) ?? null
 }
 
 const SHADES: Shade[] = [100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
 
-export function applyBackground(id: BackgroundId) {
-  const bg = BACKGROUNDS.find(b => b.id === id) ?? BACKGROUNDS[0]
+export function backgroundFor(skin: SkinSettings): Background {
+  if (skin.background === 'custom') return customBackground(skin.customBg)
+  return BACKGROUNDS.find(b => b.id === skin.background) ?? BACKGROUNDS[0]
+}
+
+export function applyBackground(skin: SkinSettings) {
+  const bg = backgroundFor(skin)
   const root = document.documentElement
   for (const shade of SHADES) {
     if (bg.scale) root.style.setProperty(`--color-green-${shade}`, bg.scale[shade])
@@ -165,4 +198,4 @@ export function applyBackground(id: BackgroundId) {
 
 // Apply the saved background before React's first paint (module load runs
 // when App imports this file)
-applyBackground(current.background)
+applyBackground(current)

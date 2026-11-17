@@ -1,13 +1,32 @@
-import { BACKGROUNDS, PRESETS, STICKS, presetFor, setSkin, useSkin } from '../lib/skins'
+import type { ReactNode } from 'react'
+import {
+  BACKGROUNDS, PRESETS, STICKS, STICK_PALETTE,
+  backgroundFor, customBackground, presetFor, setSkin, stickColor, useSkin,
+  type StickId,
+} from '../lib/skins'
 import { MatchBox } from './MatchBox'
 
-// Settings tab: pick a ready made skin, or mix background and stick style by
-// hand, and switch the streak celebrations on or off. Changes apply live.
+// Settings tab: pick a ready made skin, or mix background, stick style and
+// stick colour by hand (any colour via the wheel), and switch the streak
+// celebrations on or off. Changes apply live.
 
 export function SkinsTab() {
   const skin = useSkin()
   const activePreset = presetFor(skin)
   const tap = () => navigator.vibrate?.(8)
+  const color = stickColor(skin)
+  const ownColor = STICKS.find(s => s.id === skin.stick)!.color
+  const palette = [ownColor, ...STICK_PALETTE.filter(c => c !== ownColor)]
+  const customSelected = skin.background === 'custom'
+  const customSwatch = customBackground(skin.customBg).swatch
+
+  // Colour for the current stick style; its own colour clears the pick
+  const pickColor = (c: string) => {
+    const next: Partial<Record<StickId, string>> = { ...skin.stickColors }
+    if (c.toLowerCase() === ownColor) delete next[skin.stick]
+    else next[skin.stick] = c.toLowerCase()
+    setSkin({ stickColors: next })
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -17,9 +36,9 @@ export function SkinsTab() {
         className="rounded-xl border border-green-700 bg-green-800 px-3 py-3 flex items-center justify-center gap-2"
         aria-label="Vista previa"
       >
-        <MatchBox points={5} active stick={skin.stick} size={50} />
-        <MatchBox points={5} active stick={skin.stick} size={50} />
-        <MatchBox points={2} active stick={skin.stick} size={50} />
+        <MatchBox points={5} active stick={skin.stick} color={color} size={50} />
+        <MatchBox points={5} active stick={skin.stick} color={color} size={50} />
+        <MatchBox points={2} active stick={skin.stick} color={color} size={50} />
         <span className="ml-1 text-2xl font-black text-yellow-400 tabular-nums">12</span>
       </div>
 
@@ -32,14 +51,20 @@ export function SkinsTab() {
             return (
               <button
                 key={p.id}
-                onClick={() => { tap(); setSkin({ background: p.background, stick: p.stick }) }}
+                onClick={() => {
+                  tap()
+                  // A preset means its stick in its own colour
+                  const stickColors = { ...skin.stickColors }
+                  delete stickColors[p.stick]
+                  setSkin({ background: p.background, stick: p.stick, stickColors })
+                }}
                 aria-pressed={selected}
                 className={`relative flex flex-col items-center gap-1 rounded-xl pt-2 pb-1.5 border-2 transition active:scale-95 ${
                   selected ? 'border-yellow-400' : 'border-white/10'
                 }`}
                 style={{ backgroundColor: bg.swatch }}
               >
-                <MatchBox points={5} active stick={p.stick} size={38} />
+                <MatchBox points={5} active stick={p.stick} color={stickColor(skin, p.stick)} size={38} />
                 <span className="text-[11px] font-bold leading-tight text-white whitespace-nowrap">
                   {p.emoji} {p.name}
                 </span>
@@ -51,8 +76,8 @@ export function SkinsTab() {
       </section>
 
       <section>
-        <SectionTitle title="Fondo" note={BACKGROUNDS.find(b => b.id === skin.background)?.name} />
-        <div className="grid grid-cols-7 gap-2 px-0.5">
+        <SectionTitle title="Fondo" note={backgroundFor(skin).name} />
+        <div className="grid grid-cols-8 gap-2 px-0.5">
           {BACKGROUNDS.map(b => {
             const selected = skin.background === b.id
             return (
@@ -68,6 +93,16 @@ export function SkinsTab() {
               />
             )
           })}
+          {/* Any colour: tap selects the last pick, the wheel changes it */}
+          <ColorWheel
+            label="Fondo a elección"
+            value={skin.customBg}
+            selected={customSelected}
+            onPick={c => setSkin({ background: 'custom', customBg: c })}
+            onTap={() => { tap(); setSkin({ background: 'custom' }) }}
+          >
+            <span className="absolute inset-[3px] rounded-full" style={{ backgroundColor: customSwatch }} />
+          </ColorWheel>
         </div>
       </section>
 
@@ -85,7 +120,7 @@ export function SkinsTab() {
                   selected ? 'border-yellow-400' : 'border-green-700'
                 }`}
               >
-                <MatchBox points={5} active stick={s.id} size={34} />
+                <MatchBox points={5} active stick={s.id} color={stickColor(skin, s.id)} size={34} />
                 <span className="min-w-0">
                   <span className="block text-sm font-bold leading-tight">{s.name}</span>
                   <span className="block text-[10px] leading-tight text-green-200">{s.hint}</span>
@@ -93,6 +128,44 @@ export function SkinsTab() {
               </button>
             )
           })}
+        </div>
+
+        <div className="flex items-baseline justify-between mt-3 mb-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-green-200">
+            {skin.stick === 'fosforo' ? 'Color de la cabeza' : 'Color'}
+          </span>
+          {skin.stickColors[skin.stick] && (
+            <button onClick={() => { tap(); pickColor(ownColor) }} className="text-xs text-green-200 underline underline-offset-2">
+              Original
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-6 gap-2 px-0.5">
+          {palette.map(c => {
+            const selected = color === c
+            return (
+              <button
+                key={c}
+                onClick={() => { tap(); pickColor(c) }}
+                aria-label={c === ownColor ? 'Color original' : c}
+                aria-pressed={selected}
+                className={`w-full aspect-square rounded-full transition active:scale-90 ${
+                  selected ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-green-900' : 'ring-1 ring-white/25'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            )
+          })}
+          <ColorWheel
+            label="Color a elección"
+            value={color}
+            selected={!palette.includes(color)}
+            onPick={pickColor}
+          >
+            {!palette.includes(color) && (
+              <span className="absolute inset-[3px] rounded-full" style={{ backgroundColor: color }} />
+            )}
+          </ColorWheel>
         </div>
       </section>
 
@@ -108,6 +181,36 @@ export function SkinsTab() {
         </label>
       </section>
     </div>
+  )
+}
+
+// Rainbow swatch with a native colour picker laid over it, so a tap opens the
+// system wheel on every browser (a hidden input would not on iOS)
+function ColorWheel({ label, value, selected, onPick, onTap, children }: {
+  label: string
+  value: string
+  selected: boolean
+  onPick: (c: string) => void
+  onTap?: () => void
+  children?: ReactNode
+}) {
+  return (
+    <span
+      className={`relative w-full aspect-square rounded-full transition active:scale-90 ${
+        selected ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-green-900' : ''
+      }`}
+      style={{ background: 'conic-gradient(#f87171, #fbbf24, #a3e635, #22d3ee, #60a5fa, #c084fc, #f472b6, #f87171)' }}
+    >
+      {children}
+      <input
+        type="color"
+        aria-label={label}
+        value={value}
+        onClick={onTap}
+        onChange={e => onPick(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+      />
+    </span>
   )
 }
 

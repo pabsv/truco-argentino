@@ -4,7 +4,7 @@ Truco Argentino matchbox scoreboard PWA: local score counter with celebration ef
 
 App logic lives in `src/App.tsx` (single screen, optional 3rd "Otros" mode, team picker (`src/components/TeamPicker.tsx`: tap a team name to pick saved players or type a name; saved player list is local-only in localStorage `truco-players` via `src/lib/players.ts`), wake lock via `src/hooks/useWakeLock.ts`). Extras kept from the July 2026 PRs: streak badges, the 67 ceremony, bowling-alley win celebration, end-of-game summary chart (`src/components/GameSummary.tsx`, fed by an in-game event log in localStorage), and snapshot restore after an accidental "Nueva Partida" tap. `index.css` pins `#root { overflow:hidden; position:fixed }` so the screen stays full-bleed.
 
-Skins (Settings > Skins tab, `src/lib/skins.ts`): backgrounds re-theme the app by overriding Tailwind's `--color-green-*` variables on `<html>`, so keep using `green-*` utilities for themable surfaces and never hardcode greens. Stick styles render in `src/components/MatchBox.tsx`. The streak toggle only hides streak celebrations; the score 6 to 7 chip stays.
+Skins (Settings > Skins tab, `src/lib/skins.ts`): backgrounds re-theme the app by overriding Tailwind's `--color-green-*` variables on `<html>`, so keep using `green-*` utilities for themable surfaces and never hardcode greens. Stick styles render in `src/components/MatchBox.tsx` and take a `color` (per style pick in `stickColors`, else the style's own; for matches it tints the head). The 'custom' background builds its whole scale from one picked colour (`scaleFrom` in `src/lib/color.ts`, lightness clamped so text stays readable). The streak toggle only hides streak celebrations; the score 6 to 7 chip stays.
 
 ## History note (2026-08-29 rollback)
 

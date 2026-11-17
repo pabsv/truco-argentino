@@ -4,7 +4,7 @@ import { GameSummary, type ScoreEvent } from './components/GameSummary'
 import { ShareApp } from './components/ShareApp'
 import { CardRanking } from './components/CardRanking'
 import { teamColor } from './lib/teamColors'
-import { useSkin } from './lib/skins'
+import { stickColor, useSkin } from './lib/skins'
 import { MatchBox } from './components/MatchBox'
 import { SkinsTab } from './components/SkinsTab'
 import { TeamPicker } from './components/TeamPicker'
@@ -708,7 +708,9 @@ function LightningStrike({ position, teamCount, teamName, color }: LightningStri
 const BOX_SIZE = 62
 
 function MatchBoxes({ score }: { score: number }) {
-  const { stick } = useSkin()
+  const skin = useSkin()
+  const { stick } = skin
+  const color = stickColor(skin)
   const malasScore = Math.min(score, 15)
   const buenasScore = Math.max(0, score - 15)
 
@@ -721,6 +723,7 @@ function MatchBoxes({ score }: { score: number }) {
           points={Math.max(0, Math.min(5, malasScore - boxIndex * 5))}
           active={true}
           stick={stick}
+          color={color}
           size={BOX_SIZE}
         />
       ))}
@@ -735,6 +738,7 @@ function MatchBoxes({ score }: { score: number }) {
           points={Math.max(0, Math.min(5, buenasScore - boxIndex * 5))}
           active={score >= 15}
           stick={stick}
+          color={color}
           size={BOX_SIZE}
         />
       ))}
