@@ -264,6 +264,32 @@ function App() {
     localStorage.removeItem('truco-otros')
   }
 
+  // Hold a panel to move that team to the other side: names, scores, the
+  // event log and any running streak all follow the team to its new side
+  const swapSides = (a: TeamKey, b: TeamKey) => {
+    if (a === b) return
+    const scoreSet = { nosotros: setNosotros, ellos: setEllos, otros: setOtros }
+    const nameSet = { nosotros: setNosotrosName, ellos: setEllosName, otros: setOtrosName }
+    const scores = { nosotros, ellos, otros }
+    const names = { nosotros: nosotrosName, ellos: ellosName, otros: otrosName }
+    scoreSet[a](scores[b])
+    scoreSet[b](scores[a])
+    nameSet[a](names[b])
+    nameSet[b](names[a])
+    const flip = (k: string) => (k === a ? b : k === b ? a : k)
+    setEvents(prev => prev.map(e => ({
+      ...e,
+      team: flip(e.team),
+      scores: e.scores && { ...e.scores, [a]: e.scores[b] ?? 0, [b]: e.scores[a] ?? 0 },
+    })))
+    const s = streakRef.current
+    if (s.team) s.team = flip(s.team)
+    setStreak(prev => (prev ? { ...prev, team: flip(prev.team) } : prev))
+    setSixSeven(prev => (prev ? { ...prev, team: flip(prev.team) } : prev))
+    setLightning(null)
+    if (navigator.vibrate) navigator.vibrate([15, 40, 15])
+  }
+
   // Bring back the game interrupted by "Nueva Partida"
   const restoreGame = () => {
     if (!snapshot) return
@@ -312,6 +338,7 @@ function App() {
               score={nosotros}
               onIncrement={() => updateScore('nosotros', 1)}
               onDecrement={() => updateScore('nosotros', -1)}
+              swapTargets={threePlayerMode ? [{ label: '→', onSwap: () => swapSides('nosotros', 'ellos') }] : [{ label: '⇄ Cambiar de lado', onSwap: () => swapSides('nosotros', 'ellos') }]}
               compact={threePlayerMode}
               streak={skin.streaks && streak?.team === 'nosotros' ? streak : null}
               color={teamColor(0)}
@@ -327,6 +354,7 @@ function App() {
               score={ellos}
               onIncrement={() => updateScore('ellos', 1)}
               onDecrement={() => updateScore('ellos', -1)}
+              swapTargets={threePlayerMode ? [{ label: '←', onSwap: () => swapSides('ellos', 'nosotros') }, { label: '→', onSwap: () => swapSides('ellos', 'otros') }] : [{ label: '⇄ Cambiar de lado', onSwap: () => swapSides('ellos', 'nosotros') }]}
               compact={threePlayerMode}
               streak={skin.streaks && streak?.team === 'ellos' ? streak : null}
               color={teamColor(1)}
@@ -343,6 +371,7 @@ function App() {
                 score={otros}
                 onIncrement={() => updateScore('otros', 1)}
                 onDecrement={() => updateScore('otros', -1)}
+                swapTargets={[{ label: '←', onSwap: () => swapSides('otros', 'ellos') }]}
                 compact={threePlayerMode}
                 streak={skin.streaks && streak?.team === 'otros' ? streak : null}
                 color={teamColor(2)}
@@ -468,13 +497,48 @@ interface ScorePanelProps {
   score: number
   onIncrement: () => void
   onDecrement: () => void
+  // Shown after holding the panel: move this team to another side
+  swapTargets?: { label: string; onSwap: () => void }[]
   compact?: boolean
   streak?: { count: number; id: number } | null
   color: string
 }
 
-function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak = null, color }: ScorePanelProps) {
+const HOLD_MS = 550
+
+function ScorePanel({ score, onIncrement, onDecrement, swapTargets = [], compact = false, streak = null, color }: ScorePanelProps) {
+  const [swapOpen, setSwapOpen] = useState(false)
+  const holdRef = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null)
+
+  const cancelHold = () => {
+    if (holdRef.current) clearTimeout(holdRef.current.timer)
+  }
+  useEffect(() => cancelHold, [])
+
+  const startHold = (e: React.PointerEvent) => {
+    cancelHold()
+    const hold = { x: e.clientX, y: e.clientY, fired: false, timer: 0 }
+    hold.timer = window.setTimeout(() => {
+      hold.fired = true
+      if (swapTargets.length === 0) return
+      setSwapOpen(true)
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, HOLD_MS)
+    holdRef.current = hold
+  }
+
+  const moveHold = (e: React.PointerEvent) => {
+    const h = holdRef.current
+    if (h && !h.fired && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 12) cancelHold()
+  }
+
   const handleTap = () => {
+    // The click that ends a long press must not also add a point
+    if (holdRef.current?.fired) {
+      holdRef.current = null
+      return
+    }
+    cancelHold()
     if (score < 30) {
       onIncrement()
     }
@@ -489,10 +553,39 @@ function ScorePanel({ score, onIncrement, onDecrement, compact = false, streak =
       {/* Match boxes display - tappable to increment */}
       <div
         className="flex-1 flex items-center justify-center cursor-pointer active:opacity-80 w-full"
+        style={{ WebkitTouchCallout: 'none' }}
         onClick={handleTap}
+        onPointerDown={startHold}
+        onPointerMove={moveHold}
+        onPointerUp={cancelHold}
+        onPointerCancel={cancelHold}
+        onPointerLeave={cancelHold}
+        onContextMenu={e => e.preventDefault()}
       >
         <MatchBoxes score={score} />
       </div>
+
+      {/* Long press menu: move this team (name and count) to another side */}
+      {swapOpen && (
+        <div
+          className="modal-backdrop absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-green-950/80 rounded-lg"
+          onClick={() => setSwapOpen(false)}
+        >
+          <p className="text-sm font-semibold text-green-100">Mover al otro lado</p>
+          <div className="flex gap-2">
+            {swapTargets.map(t => (
+              <button
+                key={t.label}
+                onClick={e => { e.stopPropagation(); setSwapOpen(false); t.onSwap() }}
+                className="px-4 py-3 min-w-14 text-lg font-bold rounded-xl bg-yellow-500 active:bg-yellow-300 text-green-950 shadow-lg transition active:scale-95"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-green-200/70">Tocá afuera para cancelar</span>
+        </div>
+      )}
 
       {/* Increment/Decrement buttons */}
       <div className={`flex ${buttonGap} flex-shrink-0 pt-2`}>
