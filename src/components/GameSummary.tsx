@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { teamColor } from '../lib/teamColors'
+import { addPoint, breakRun, type Runs } from '../lib/streaks'
 
 // One entry per effective score change during the game; the full log lets the
 // summary reconstruct how the match unfolded (momentum, streaks, lead changes).
@@ -92,19 +93,17 @@ function computeStats(events: ScoreEvent[], timeline: number[][], teams: Summary
 
   const indexByKey = new Map(teams.map((t, i) => [t.key, i]))
   let bestRun: SummaryStats['bestRun'] = null
-  let runTeam: string | null = null
-  let runLength = 0
+  // Same rule as the live streak badges: per-team runs (see lib/streaks)
+  const runs: Runs = {}
+  const active = teams.map(t => t.key)
   for (const e of events) {
-    if (e.delta > 0 && indexByKey.has(e.team)) {
-      if (e.team === runTeam) runLength++
-      else {
-        runTeam = e.team
-        runLength = 1
-      }
-      if (!bestRun || runLength > bestRun.length) bestRun = { team: indexByKey.get(runTeam)!, length: runLength }
+    if (!indexByKey.has(e.team)) continue
+    if (e.delta > 0) {
+      addPoint(runs, e.team, active)
+      const length = runs[e.team].count
+      if (!bestRun || length > bestRun.length) bestRun = { team: indexByKey.get(e.team)!, length }
     } else {
-      runTeam = null
-      runLength = 0
+      breakRun(runs, e.team)
     }
   }
 

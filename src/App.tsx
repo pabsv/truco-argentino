@@ -9,6 +9,7 @@ import { MatchBox } from './components/MatchBox'
 import { SkinsTab } from './components/SkinsTab'
 import { TeamPicker } from './components/TeamPicker'
 import { loadPlayers, savePlayers } from './lib/players'
+import { addPoint, breakRun, type Runs } from './lib/streaks'
 
 const WINNING_SCORE = 30
 // Score at which the buenas boxes light up
@@ -85,17 +86,18 @@ function App() {
   // Last game interrupted by "Nueva Partida" — offered back until the new game starts
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(loadSnapshot)
 
-  // Streak: a run of points by the same team triggers a celebration. It lasts
-  // as long as the team keeps scoring — only a rival point or a correction
-  // breaks it, no matter how much time passes between points.
-  const streakRef = useRef<{ team: string | null; count: number }>({ team: null, count: 0 })
-  const [streak, setStreak] = useState<{ team: string; count: number; id: number } | null>(null)
+  // Streak: a run of points by the same team triggers a celebration. Each
+  // team has its own run (see lib/streaks): it lasts until every rival has
+  // scored since the team's last point, or a correction, no matter how much
+  // time passes. With 3 teams two of them can be on a run at the same time.
+  const streakRef = useRef<Runs>({})
+  const [streaks, setStreaks] = useState<Record<string, { count: number; id: number }>>({})
 
   useEffect(() => {
-    if (!streak) return
-    const timer = setTimeout(() => setStreak(null), 2600)
+    if (Object.keys(streaks).length === 0) return
+    const timer = setTimeout(() => setStreaks({}), 2600)
     return () => clearTimeout(timer)
-  }, [streak])
+  }, [streaks])
 
   // The 67 moment: a streak that goes 6... and then 7 shows the 67 chip for a
   // few seconds. Is it good? Is it bad? It's 67.
@@ -212,25 +214,22 @@ function App() {
       setLightning({ team, id: Date.now() })
     }
 
-    const s = streakRef.current
+    const runs = streakRef.current
+    const dropStreaks = (gone: string[]) => {
+      if (gone.length === 0) return
+      setStreaks(prev => Object.fromEntries(Object.entries(prev).filter(([k]) => !gone.includes(k))))
+      setSixSeven(prev => (prev && gone.includes(prev.team) ? null : prev))
+    }
     if (delta > 0) {
-      if (s.team === team) {
-        s.count += 1
-      } else {
-        s.team = team
-        s.count = 1
-        // A rival point silences any celebration still on screen
-        setStreak(prev => (prev && prev.team !== team ? null : prev))
-        setSixSeven(prev => (prev && prev.team !== team ? null : prev))
-      }
-      if (s.count >= 3) setStreak({ team, count: s.count, id: Date.now() })
-      if (s.count === 7) setSixSeven({ team, id: Date.now() })
+      // A broken run silences that team's celebration if it's still on screen
+      dropStreaks(addPoint(runs, team, teams.map(t => t.key)))
+      const count = runs[team].count
+      if (count >= 3) setStreaks(prev => ({ ...prev, [team]: { count, id: Date.now() } }))
+      if (count === 7) setSixSeven({ team, id: Date.now() })
     } else {
-      // A correction breaks the streak and re-arms the celebration
-      s.team = null
-      s.count = 0
-      setStreak(prev => (prev?.team === team ? null : prev))
-      setSixSeven(prev => (prev?.team === team ? null : prev))
+      // A correction breaks that team's streak and re-arms the celebration
+      breakRun(runs, team)
+      dropStreaks([team])
       setCelebrationDismissedFor(null)
     }
 
@@ -254,8 +253,8 @@ function App() {
     setOtros(0)
     setEvents([])
     setSummaryDismissed(false)
-    streakRef.current = { team: null, count: 0 }
-    setStreak(null)
+    streakRef.current = {}
+    setStreaks({})
     setSixSeven(null)
     setLightning(null)
     setCelebrationDismissedFor(null)
@@ -282,9 +281,10 @@ function App() {
       team: flip(e.team),
       scores: e.scores && { ...e.scores, [a]: e.scores[b] ?? 0, [b]: e.scores[a] ?? 0 },
     })))
-    const s = streakRef.current
-    if (s.team) s.team = flip(s.team)
-    setStreak(prev => (prev ? { ...prev, team: flip(prev.team) } : prev))
+    streakRef.current = Object.fromEntries(
+      Object.entries(streakRef.current).map(([k, r]) => [flip(k), { ...r, rivals: r.rivals.map(flip) }]),
+    )
+    setStreaks(prev => Object.fromEntries(Object.entries(prev).map(([k, v]) => [flip(k), v])))
     setSixSeven(prev => (prev ? { ...prev, team: flip(prev.team) } : prev))
     setLightning(null)
     if (navigator.vibrate) navigator.vibrate([15, 40, 15])
@@ -340,7 +340,7 @@ function App() {
               onDecrement={() => updateScore('nosotros', -1)}
               swapTargets={threePlayerMode ? [{ label: '→', onSwap: () => swapSides('nosotros', 'ellos') }] : [{ label: '⇄ Cambiar de lado', onSwap: () => swapSides('nosotros', 'ellos') }]}
               compact={threePlayerMode}
-              streak={skin.streaks && streak?.team === 'nosotros' ? streak : null}
+              streak={(skin.streaks && streaks.nosotros) || null}
               color={teamColor(0)}
             />
           </div>
@@ -356,7 +356,7 @@ function App() {
               onDecrement={() => updateScore('ellos', -1)}
               swapTargets={threePlayerMode ? [{ label: '←', onSwap: () => swapSides('ellos', 'nosotros') }, { label: '→', onSwap: () => swapSides('ellos', 'otros') }] : [{ label: '⇄ Cambiar de lado', onSwap: () => swapSides('ellos', 'nosotros') }]}
               compact={threePlayerMode}
-              streak={skin.streaks && streak?.team === 'ellos' ? streak : null}
+              streak={(skin.streaks && streaks.ellos) || null}
               color={teamColor(1)}
             />
           </div>
@@ -373,7 +373,7 @@ function App() {
                 onDecrement={() => updateScore('otros', -1)}
                 swapTargets={[{ label: '←', onSwap: () => swapSides('otros', 'ellos') }]}
                 compact={threePlayerMode}
-                streak={skin.streaks && streak?.team === 'otros' ? streak : null}
+                streak={(skin.streaks && streaks.otros) || null}
                 color={teamColor(2)}
               />
             </div>
